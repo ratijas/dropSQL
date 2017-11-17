@@ -4,7 +4,7 @@ from . import __version__
 from .connection import Connection
 
 
-def open_file_or_memory():
+def open_file_or_memory() -> Connection:
     if len(sys.argv) == 2:
         path = sys.argv[1]
         conn = Connection(path)
@@ -16,7 +16,7 @@ def open_file_or_memory():
 
 
 def launch():
-    conn: Connection = open_file_or_memory()
+    conn = open_file_or_memory()
 
     print(f'/dropSQL version {__version__}\n'
           'Enter ".help" for usage hints.\n'
