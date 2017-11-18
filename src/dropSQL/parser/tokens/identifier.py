@@ -1,7 +1,19 @@
+import abc
+
 from . import *
 
+__all__ = (
+    'IdentifierBase',
+    'Identifier',
+    'Reserved',
+)
 
-class Identifier(Token):
+
+class IdentifierBase(Token, metaclass=abc.ABCMeta):
+    """
+    Abstract base class for identifiers and reserved keywords.
+    """
+
     def __init__(self, identifier: str, slash: bool = False) -> None:
         super().__init__()
 
@@ -14,5 +26,13 @@ class Identifier(Token):
         else:
             return f'{self.identifier}'
 
-    def __eq__(self, o: 'Identifier') -> bool:
-        return isinstance(o, Identifier) and self.identifier.lower() == o.identifier.lower()
+    def __eq__(self, o: 'IdentifierBase') -> bool:
+        return isinstance(o, self.__class__) and self.identifier.lower() == o.identifier.lower()
+
+
+class Identifier(IdentifierBase):
+    pass
+
+
+class Reserved(IdentifierBase):
+    pass

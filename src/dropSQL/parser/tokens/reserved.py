@@ -24,101 +24,101 @@ __all__ = (
 )
 
 
-class As(Identifier):
+class As(Reserved):
     def __init__(self) -> None:
         super().__init__('as', True)
 
 
-class Create(Identifier):
+class Create(Reserved):
     def __init__(self) -> None:
         super().__init__('create', True)
 
 
-class Drop(Identifier):
+class Drop(Reserved):
     def __init__(self) -> None:
         super().__init__('drop', True)
 
 
-class Delete(Identifier):
+class Delete(Reserved):
     def __init__(self) -> None:
         super().__init__('delete', True)
 
 
-class Select(Identifier):
+class Select(Reserved):
     def __init__(self) -> None:
         super().__init__('select', True)
 
 
-class From(Identifier):
+class From(Reserved):
     def __init__(self) -> None:
         super().__init__('from', False)
 
 
-class Join(Identifier):
+class Join(Reserved):
     def __init__(self) -> None:
         super().__init__('join', True)
 
 
-class On(Identifier):
+class On(Reserved):
     def __init__(self) -> None:
         super().__init__('on', True)
 
 
-class Table(Identifier):
+class Table(Reserved):
     def __init__(self) -> None:
         super().__init__('table', False)
 
 
-class If(Identifier):
+class If(Reserved):
     def __init__(self) -> None:
         super().__init__('if', False)
 
 
-class Not(Identifier):
+class Not(Reserved):
     def __init__(self) -> None:
         super().__init__('not', False)
 
 
-class Exists(Identifier):
+class Exists(Reserved):
     def __init__(self) -> None:
         super().__init__('exists', False)
 
 
-class Primary(Identifier):
+class Primary(Reserved):
     def __init__(self) -> None:
         super().__init__('primary', True)
 
 
-class Key(Identifier):
+class Key(Reserved):
     def __init__(self) -> None:
         super().__init__('key', False)
 
 
-class Insert(Identifier):
+class Insert(Reserved):
     def __init__(self) -> None:
         super().__init__('insert', True)
 
 
-class Into(Identifier):
+class Into(Reserved):
     def __init__(self) -> None:
         super().__init__('into', False)
 
 
-class Update(Identifier):
+class Update(Reserved):
     def __init__(self) -> None:
         super().__init__('update', True)
 
 
-class Set(Identifier):
+class Set(Reserved):
     def __init__(self) -> None:
         super().__init__('set', True)
 
 
-class Values(Identifier):
+class Values(Reserved):
     def __init__(self) -> None:
         super().__init__('values', False)
 
 
-class Where(Identifier):
+class Where(Reserved):
     def __init__(self) -> None:
         super().__init__('where', True)

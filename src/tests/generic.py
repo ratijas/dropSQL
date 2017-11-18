@@ -42,7 +42,7 @@ class GenericTestCase(TestCase):
 
         s = TokenStream(Stream('/drop'))
         tok = s.gettok().ok()  # type: Token
-        self.assertTrue(cast(tok, Identifier))
+        self.assertTrue(cast(tok, Reserved))
         self.assertTrue(cast(tok, Drop))
         self.assertFalse(cast(tok, Operator))
 

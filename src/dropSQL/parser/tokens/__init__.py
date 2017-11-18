@@ -2,7 +2,7 @@ from typing import *
 
 from ..expected import Expected
 from .token import Token
-from .identifier import Identifier
+from .identifier import IdentifierBase, Identifier, Reserved
 from . import reserved as __reserved
 from .reserved import *
 from .operator import Operator
@@ -20,7 +20,9 @@ __all__ = (
     'TokenStream',
     'next_token',
 
+    'IdentifierBase',
     'Identifier',
+    'Reserved',
 
     # reserved
     'As',
