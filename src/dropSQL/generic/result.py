@@ -30,9 +30,11 @@ class Result(Generic[T, E]):
 
     def __bool__(self): return self.is_ok()
 
+    def __repr__(self) -> str: raise NotImplementedError
+
 
 class Ok(Generic[T, E], Result[T, E]):
-    def __init__(self, ok: T):
+    def __init__(self, ok: T) -> None:
         self._ok: T = ok
 
     def is_ok(self): return True
@@ -51,9 +53,11 @@ class Ok(Generic[T, E], Result[T, E]):
 
     def and_then(self, f: Callable[[T], 'Result[U, E]']) -> 'Result[U, E]': return f(self._ok)
 
+    def __repr__(self) -> str: return f'Result.Ok( {repr(self._ok)} )'
+
 
 class Err(Generic[T, E], Result[T, E]):
-    def __init__(self, err: E):
+    def __init__(self, err: E) -> None:
         self._err: E = err
 
     def is_ok(self): return False
@@ -71,3 +75,5 @@ class Err(Generic[T, E], Result[T, E]):
     def map_err(self, f: Callable[[E], U]) -> 'Result[T, U]': return Err(f(self._err))
 
     def and_then(self, f: Callable[[T], 'Result[U, E]']) -> 'Result[U, E]': return Err(self._err)
+
+    def __repr__(self) -> str: return f'Result.Err( {repr(self._err)} )'
