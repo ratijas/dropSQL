@@ -1,15 +1,11 @@
 from typing import *
 
 __all__ = (
-    'Token',
-    'Error',
+    'Expected',
 )
 
 
-class Token: pass
-
-
-class Error:
+class Expected:
     def __init__(self, expected: List[str], got: str) -> None:
         self.expected = expected
         self.got = got

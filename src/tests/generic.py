@@ -1,5 +1,6 @@
 from unittest import TestCase
 
+from dropSQL.parser.expected import Expected
 from dropSQL.parser.tokens import *
 from dropSQL.generic import *
 
@@ -10,10 +11,10 @@ class GenericTestCase(TestCase):
         self.assertTrue(res.is_ok())
         self.assertEqual(res.ok(), 42)
 
-        res = Err(Error(['token'], 'EOF'))
+        res = Err(Expected(['token'], 'EOF'))
         self.assertTrue(res.is_err())
         self.assertFalse(res.is_ok())
-        self.assertIsInstance(res.err(), Error)
+        self.assertIsInstance(res.err(), Expected)
 
     def test_result_fn(self):
         res: Result[int, None] = Ok(42)

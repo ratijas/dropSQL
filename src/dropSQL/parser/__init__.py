@@ -184,7 +184,3 @@ placeholder
     ;
 
 """
-
-
-def say(x):
-    return x

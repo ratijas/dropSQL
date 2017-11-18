@@ -1,6 +1,7 @@
 from typing import *
 
-from .common import *
+from ..expected import Expected
+from .token import Token
 from .identifier import Identifier
 from . import reserved as __reserved
 from .reserved import *
@@ -14,7 +15,6 @@ from dropSQL.generic import Result, Ok, Err
 
 __all__ = (
     'Token',
-    'Error',
 
     'Stream',
     'TokenStream',
@@ -104,9 +104,9 @@ class TokenStream:
         self.cursor: int = 0
         self.done: bool = False  # once gettok on exhausted stream, this flag will always be True.
 
-    def gettok(self) -> Result[Token, Error]:
+    def gettok(self) -> Result[Token, Expected]:
         if self.cursor >= len(self.tokens):
-            tok = Err(Error(['token'], 'EOF'))
+            tok = Err(Expected(['token'], 'EOF'))
             self.done = True
 
         else:
@@ -132,7 +132,7 @@ keywords.update({
 })
 
 
-def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Error]:
+def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Expected]:
     if skip_space:
         skip_whitespaces(stream)
 
@@ -141,7 +141,7 @@ def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Error]:
     stream.ungetch()
 
     if char == EOF:
-        return Err(Error(['token'], 'EOF'))
+        return Err(Expected(['token'], 'EOF'))
 
     elif char == ',':
         return Ok(Comma())
@@ -169,13 +169,13 @@ def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Error]:
                 f = float(num)
                 return Ok(Float(f))
             except (ValueError, OverflowError) as _:
-                return Err(Error(['float'], 'parse error'))
+                return Err(Expected(['float'], 'parse error'))
         else:
             try:
                 i = int(num, 10)
                 return Ok(Integer(i))
             except (ValueError, OverflowError) as _:
-                return Err(Error(['int'], 'parse error'))
+                return Err(Expected(['int'], 'parse error'))
 
     elif char == '-':
         if next_char == '-':
@@ -208,12 +208,12 @@ def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Error]:
         else:
             integer = index.ok()
             if not isinstance(integer, Integer):
-                return Err(Error(['integer'], integer.__class__.__name__))
+                return Err(Expected(['integer'], integer.__class__.__name__))
             else:
                 return Ok(Placeholder(integer.value))
 
     else:
-        return Err(Error(['token'], char))
+        return Err(Expected(['token'], char))
 
 
 def tok_identifier(stream: Stream, char: str) -> Token:
@@ -235,7 +235,7 @@ def tok_identifier(stream: Stream, char: str) -> Token:
         return Identifier(ident, slash)
 
 
-def tok_string(stream: Stream) -> Result[String, Error]:
+def tok_string(stream: Stream) -> Result[String, Expected]:
     string = ''
     char = stream.getch().ok_or(EOF)
     while char != EOF and char != '\'':
@@ -248,7 +248,7 @@ def tok_string(stream: Stream) -> Result[String, Error]:
     # no ungetch because we want to consume the closing quote
 
     if char == EOF:
-        return Err(Error(['string literal'], 'EOF'))
+        return Err(Expected(['string literal'], 'EOF'))
     else:
         return Ok(String(string))
 

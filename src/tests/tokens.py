@@ -1,13 +1,10 @@
 from unittest import TestCase
 
-from dropSQL import parser
+from dropSQL.parser.expected import Expected
 from dropSQL.parser.tokens import *
 
 
 class ParserTestCase(TestCase):
-    def test_say(self):
-        self.assertEqual("hi", parser.say("hi"))
-
     def test_identifier(self):
         ident = Identifier('drop', slash=True)
         self.assertEqual('/drop', str(ident))
@@ -16,7 +13,7 @@ class ParserTestCase(TestCase):
         s = Stream('')
         tok = next_token(s)
         self.assertTrue(tok.is_err())
-        self.assertIsInstance(tok.err(), Error)
+        self.assertIsInstance(tok.err(), Expected)
         self.assertEqual(tok.err().got, 'EOF')
 
     def test_punctuation(self):
