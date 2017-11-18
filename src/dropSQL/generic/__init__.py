@@ -1,4 +1,4 @@
 from .result import *
-from .cast import cast
+from .cast import *
 
-__all__ = result.__all__ + ('cast',)
+__all__ = result.__all__ + ('cast', 'caster', 'drop',)

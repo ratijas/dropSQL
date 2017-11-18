@@ -45,3 +45,14 @@ class GenericTestCase(TestCase):
         self.assertTrue(cast(tok, Identifier))
         self.assertTrue(cast(tok, Drop))
         self.assertFalse(cast(tok, Operator))
+
+    def test_caster(self):
+        cs = caster(int)
+        ok = cs(42)
+        err = cs(0.3)
+
+        self.assertTrue(ok)
+        self.assertFalse(err)
+
+        err = caster(LParen)(Create())
+        self.assertFalse(err)
