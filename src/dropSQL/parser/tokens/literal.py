@@ -17,6 +17,9 @@ class Literal(Token, Generic[T]):
 
         self.value: T = value
 
+    def __repr__(self) -> str:
+        return f'<{repr(self.__class__)}( {self.value} )>'
+
     def __eq__(self, o: T) -> bool:
         return isinstance(o, type(self)) and self.value == o.value
 
