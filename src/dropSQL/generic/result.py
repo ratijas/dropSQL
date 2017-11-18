@@ -28,6 +28,8 @@ class Result(Generic[T, E]):
 
     def and_then(self, f: Callable[[T], 'Result[U, E]']) -> 'Result[U, E]': raise NotImplementedError
 
+    def __bool__(self): return self.is_ok()
+
 
 class Ok(Generic[T, E], Result[T, E]):
     def __init__(self, ok: T):

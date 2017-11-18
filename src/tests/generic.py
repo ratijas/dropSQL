@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from dropSQL.parser.tokens import Error
+from dropSQL.parser.tokens import *
 from dropSQL.generic import *
 
 
@@ -32,3 +32,15 @@ class GenericTestCase(TestCase):
 
         ok: str = res.ok_or('abc')
         self.assertEqual(ok, 'abc')
+
+    def test_cast(self):
+        i = 5
+        res = cast(i, float)
+        self.assertTrue(res.is_err())
+        self.assertFalse(res)
+
+        s = TokenStream(Stream('/drop'))
+        tok = s.gettok().ok()  # type: Token
+        self.assertTrue(cast(tok, Identifier))
+        self.assertTrue(cast(tok, Drop))
+        self.assertFalse(cast(tok, Operator))
