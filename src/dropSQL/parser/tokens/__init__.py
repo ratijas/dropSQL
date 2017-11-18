@@ -1,6 +1,7 @@
 from typing import *
 from .common import *
 from .identifier import Identifier
+from . import reserved as __reserved
 from .reserved import *
 from .operator import Operator
 from .literal import Literal, Integer, Float, String
@@ -8,7 +9,7 @@ from .placehodler import Placeholder
 from .comma import Comma
 from .paren import LParen, RParen
 
-__all__ = (
+__all__ = __reserved.__all__ + (
     'Result',
     'Error',
     'Token',
@@ -16,18 +17,6 @@ __all__ = (
     'next_token',
 
     'Identifier',
-
-    'Create',
-    'Drop',
-    'Table',
-    'If',
-    'Not',
-    'Exists',
-    'Values',
-    'Primary',
-    'Key',
-    'Insert',
-    'Into',
 
     'Operator',
 
@@ -70,26 +59,19 @@ class Stream:
                 (len(char) == 1 and not self.done))
         return char
 
-    def ungetch(self):
+    def ungetch(self) -> None:
         if not self.done and self.cursor > 0:
             self.cursor -= 1
 
 
 keywords: Dict[str, Token] = {
-    'create' : Create(),
-    'drop'   : Drop(),
-    'table'  : Table(),
-    'if'     : If(),
-    'not'    : Not(),
-    'exists' : Exists(),
-    'values' : Values(),
-    'primary': Primary(),
-    'key'    : Key(),
-    'insert' : Insert(),
-    'into'   : Into(),
-    'and'    : Operator('/and'),
-    'or'     : Operator('/or'),
+    k.lower(): getattr(__reserved, k)()
+    for k in __reserved.__all__
 }
+keywords.update({
+    'and': Operator('/and'),
+    'or' : Operator('/or'),
+})
 
 
 def next_token(stream: Stream, skip_space: bool = True) -> Result:
@@ -138,7 +120,6 @@ def next_token(stream: Stream, skip_space: bool = True) -> Result:
                 return Error(['int'], 'parse error')
 
     elif char == '-':
-        next_char = stream.getch()
         if next_char == '-':
             # comment, skip until EOL of EOF
             while char != EOF and char != '\n' and char != '\r':
@@ -147,7 +128,6 @@ def next_token(stream: Stream, skip_space: bool = True) -> Result:
             return next_token(stream)
 
         else:
-            stream.ungetch()
             return Operator('-')
 
     elif char == '\'':
