@@ -11,7 +11,7 @@ from .placehodler import Placeholder
 from .comma import Comma
 from .paren import LParen, RParen
 
-from dropSQL.generic import Result, Ok, Err
+from dropSQL.generic import Result, Ok, Err, IterOk
 
 __all__ = (
     'Token',
@@ -95,11 +95,7 @@ class TokenStream:
     def __init__(self, stream: Stream) -> None:
         super().__init__()
 
-        self.tokens = []
-        tok = next_token(stream)
-        while tok.is_ok():
-            self.tokens.append(tok.ok())
-            tok = next_token(stream)
+        self.tokens = list(IterOk(lambda: next_token(stream)))
 
         self.cursor: int = 0
         self.done: bool = False  # once gettok on exhausted stream, this flag will always be True.
