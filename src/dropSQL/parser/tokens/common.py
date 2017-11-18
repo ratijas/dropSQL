@@ -1,24 +1,15 @@
 from typing import *
 
 __all__ = (
-    'Result',
     'Token',
     'Error',
 )
 
 
-class Result:
-    def is_ok(self):
-        return isinstance(self, Token)
-
-    def is_err(self):
-        return isinstance(self, Error)
+class Token: pass
 
 
-class Token(Result): pass
-
-
-class Error(Result):
+class Error:
     def __init__(self, expected: List[str], got: str) -> None:
         self.expected = expected
         self.got = got

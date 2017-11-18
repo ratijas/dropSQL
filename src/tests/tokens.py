@@ -15,23 +15,24 @@ class ParserTestCase(TestCase):
     def test_eof(self):
         s = Stream('')
         tok = next_token(s)
-        self.assertIsInstance(tok, Error)
-        self.assertEqual(tok.got, 'EOF')
+        self.assertTrue(tok.is_err())
+        self.assertIsInstance(tok.err(), Error)
+        self.assertEqual(tok.err().got, 'EOF')
 
     def test_punctuation(self):
         s = Stream('( , )')
-        tok = next_token(s)
+        tok = next_token(s).ok()
         self.assertIsInstance(tok, LParen)
-        tok = next_token(s)
+        tok = next_token(s).ok()
         self.assertIsInstance(tok, Comma)
-        tok = next_token(s)
+        tok = next_token(s).ok()
         self.assertIsInstance(tok, RParen)
         tok = next_token(s)
-        self.assertIsInstance(tok, Error)
+        self.assertTrue(tok.is_err())
 
     def test_more_identifiers(self):
         s = Stream('/create table if not exists /students /drop')
-        n = lambda: next_token(s)
+        n = lambda: next_token(s).ok()
 
         tok = (n(), n(), n(), n(), n(), n(), n())
         self.assertIsInstance(tok[0], Create)
@@ -48,38 +49,42 @@ class ParserTestCase(TestCase):
 
     def test_literals(self):
         s = Stream('42 15.37 \'UFO\'')
-        tok = next_token(s)
+
+        tok = next_token(s).ok()
         self.assertIsInstance(tok, Integer)
         self.assertEqual(42, tok.value)
-        tok = next_token(s)
+
+        tok = next_token(s).ok()
         self.assertIsInstance(tok, Float)
         self.assertAlmostEqual(15.37, tok.value, 2)
-        tok = next_token(s)
+
+        tok = next_token(s).ok()
         self.assertIsInstance(tok, String)
         self.assertEqual('UFO', tok.value)
 
         s = Stream(' \'not the...')
         tok = next_token(s)
-        self.assertIsInstance(tok, Error)
+        self.assertTrue(tok.is_err())
 
         s = Stream(" 'abc\\' def' ")
-        tok = next_token(s)
+        tok = next_token(s).ok()
         self.assertEqual(tok, String("abc' def"))
 
     def test_comment(self):
         s = Stream('42, -- this is the answer\n'
                    '37  -- while this one is definitely not.\n')
-        n = lambda: next_token(s)
-        tok = (n(), n(), n(), n())
+        n = lambda: next_token(s).ok()
+        tok = (n(), n(), n(), next_token(s))
+
         self.assertEqual(tok[0], Integer(42))
         self.assertIsInstance(tok[1], Comma)
         self.assertEqual(tok[2], Integer(37))
-        self.assertIsInstance(tok[3], Error)
+        self.assertTrue(tok[3].is_err())
 
     def test_operators(self):
         s = Stream(
             '  *    >=   >    /=   /    /5        /and')
-        n = lambda: next_token(s)
+        n = lambda: next_token(s).ok()
 
         tok = (n(), n(), n(), n(), n(), n(), n(), n())
         self.assertEqual(tok[0], Operator('*'))
@@ -93,39 +98,39 @@ class ParserTestCase(TestCase):
 
     def test_placeholder(self):
         s = Stream('?1, ?32 ? 4')
-        n = lambda: next_token(s)
+        n = lambda: next_token(s).ok()
+        tok = (n(), n(), n(), next_token(s))
 
-        tok = (n(), n(), n(), n())
         self.assertEqual(tok[0], Placeholder(1))
         self.assertIsInstance(tok[1], Comma)
         self.assertEqual(tok[2], Placeholder(32))
-        self.assertIsInstance(tok[3], Error)
+        self.assertTrue(tok[3].is_err())
 
     def test_all_keywords(self):
         # @formatter:off
-        self.assertIsInstance(next_token(Stream('and')),        Operator)
-        self.assertIsInstance(next_token(Stream('as')),         As)
-        self.assertIsInstance(next_token(Stream('create')),     Create)
-        self.assertIsInstance(next_token(Stream('delete')),     Delete)
-        self.assertIsInstance(next_token(Stream('drop')),       Drop)
-        self.assertIsInstance(next_token(Stream('exists')),     Exists)
-        self.assertIsInstance(next_token(Stream('float')),      Identifier)
-        self.assertIsInstance(next_token(Stream('from')),       From)
-        self.assertIsInstance(next_token(Stream('if')),         If)
-        self.assertIsInstance(next_token(Stream('insert')),     Insert)
-        self.assertIsInstance(next_token(Stream('integer')),    Identifier)
-        self.assertIsInstance(next_token(Stream('into')),       Into)
-        self.assertIsInstance(next_token(Stream('join')),       Join)
-        self.assertIsInstance(next_token(Stream('key')),        Key)
-        self.assertIsInstance(next_token(Stream('not')),        Not)
-        self.assertIsInstance(next_token(Stream('on')),         On)
-        self.assertIsInstance(next_token(Stream('or')),         Operator)
-        self.assertIsInstance(next_token(Stream('primary')),    Primary)
-        self.assertIsInstance(next_token(Stream('select')),     Select)
-        self.assertIsInstance(next_token(Stream('set')),        Set)
-        self.assertIsInstance(next_token(Stream('table')),      Table)
-        self.assertIsInstance(next_token(Stream('update')),     Update)
-        self.assertIsInstance(next_token(Stream('values')),     Values)
-        self.assertIsInstance(next_token(Stream('varchar')),    Identifier)
-        self.assertIsInstance(next_token(Stream('where')),      Where)
+        self.assertIsInstance(next_token(Stream('and')).ok(),        Operator)
+        self.assertIsInstance(next_token(Stream('as')).ok(),         As)
+        self.assertIsInstance(next_token(Stream('create')).ok(),     Create)
+        self.assertIsInstance(next_token(Stream('delete')).ok(),     Delete)
+        self.assertIsInstance(next_token(Stream('drop')).ok(),       Drop)
+        self.assertIsInstance(next_token(Stream('exists')).ok(),     Exists)
+        self.assertIsInstance(next_token(Stream('float')).ok(),      Identifier)
+        self.assertIsInstance(next_token(Stream('from')).ok(),       From)
+        self.assertIsInstance(next_token(Stream('if')).ok(),         If)
+        self.assertIsInstance(next_token(Stream('insert')).ok(),     Insert)
+        self.assertIsInstance(next_token(Stream('integer')).ok(),    Identifier)
+        self.assertIsInstance(next_token(Stream('into')).ok(),       Into)
+        self.assertIsInstance(next_token(Stream('join')).ok(),       Join)
+        self.assertIsInstance(next_token(Stream('key')).ok(),        Key)
+        self.assertIsInstance(next_token(Stream('not')).ok(),        Not)
+        self.assertIsInstance(next_token(Stream('on')).ok(),         On)
+        self.assertIsInstance(next_token(Stream('or')).ok(),         Operator)
+        self.assertIsInstance(next_token(Stream('primary')).ok(),    Primary)
+        self.assertIsInstance(next_token(Stream('select')).ok(),     Select)
+        self.assertIsInstance(next_token(Stream('set')).ok(),        Set)
+        self.assertIsInstance(next_token(Stream('table')).ok(),      Table)
+        self.assertIsInstance(next_token(Stream('update')).ok(),     Update)
+        self.assertIsInstance(next_token(Stream('values')).ok(),     Values)
+        self.assertIsInstance(next_token(Stream('varchar')).ok(),    Identifier)
+        self.assertIsInstance(next_token(Stream('where')).ok(),      Where)
         # @formatter:on
