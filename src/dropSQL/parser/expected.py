@@ -12,6 +12,9 @@ class Expected:
 
     def __str__(self) -> str:
         if len(self.expected) == 1:
-            return f'expected {self.expected[0]}, got {self.got}.'
+            return f'Expected {self.expected[0]}; got {self.got}.'
         else:
-            return f'expected one of {", ".join(self.expected)}; got {self.got}.'
+            return f'Expected one of {", ".join(self.expected)}; got {self.got}.'
+
+    def __repr__(self) -> str:
+        return f'Expected( {repr(self.expected)}, {repr(self.got)} )'
