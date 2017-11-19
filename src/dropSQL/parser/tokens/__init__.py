@@ -100,10 +100,6 @@ class TokenStream:
         self.tokens = list(IterOk(lambda: next_token(stream)))
         self.error = next_token(stream).err()
 
-        # TODO: use logging
-        if self.error.got != 'EOF':
-            print('token stream ends on', str(self.error))
-
         self.cursor: int = 0
         self.done: bool = False  # once gettok on exhausted stream, this flag will always be True.
 
