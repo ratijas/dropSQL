@@ -4,7 +4,7 @@ from dropSQL.parser.expected import Expected
 from dropSQL.parser.tokens import *
 
 
-class ParserTestCase(TestCase):
+class TokensTestCase(TestCase):
     def test_identifier(self):
         ident = Identifier('drop', slash=True)
         self.assertEqual('/drop', str(ident))
@@ -43,6 +43,23 @@ class ParserTestCase(TestCase):
         ident: Identifier = tok[5]
         self.assertEqual(ident.identifier, 'students')
         self.assertTrue(ident.slash)
+
+        s = Stream('/file_id')
+        tok = next_token(s)
+        print('file id token')
+        print(tok)
+        tok = next_token(s)
+        print(tok)
+
+    def test_next_token_consistent_error(self):
+        s = Stream('file[id]')
+        res = next_token(s)
+        self.assertTrue(res)
+        res = next_token(s)
+        self.assertFalse(res)
+        self.assertEqual(res.err().got, '[')
+        res = next_token(s)
+        self.assertFalse(res)
 
     def test_literals(self):
         s = Stream('42 15.37 \'UFO\'')
@@ -131,3 +148,9 @@ class ParserTestCase(TestCase):
         self.assertIsInstance(next_token(Stream('varchar')).ok(),    Identifier)
         self.assertIsInstance(next_token(Stream('where')).ok(),      Where)
         # @formatter:on
+
+
+class TokenStreamTestCase(TestCase):
+    def test_broken(self):
+        s = 'file[id]'
+        ts = TokenStream(Stream(s))

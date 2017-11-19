@@ -98,13 +98,18 @@ class TokenStream:
         super().__init__()
 
         self.tokens = list(IterOk(lambda: next_token(stream)))
+        self.error = next_token(stream).err()
+
+        # TODO: use logging
+        if self.error.got != 'EOF':
+            print('token stream ends on', str(self.error))
 
         self.cursor: int = 0
         self.done: bool = False  # once gettok on exhausted stream, this flag will always be True.
 
     def gettok(self) -> Result[Token, Expected]:
         if self.cursor >= len(self.tokens):
-            tok = Err(Expected(['token'], 'EOF'))
+            tok = Err(self.error)
             self.done = True
 
         else:
@@ -131,6 +136,13 @@ keywords.update({
 
 
 def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Expected]:
+    """
+    Extract next token from character stream.
+
+    Error could be one of two types:
+    - got == 'EOF'
+    - and all the others.
+    """
     if skip_space:
         skip_whitespaces(stream)
 
@@ -167,13 +179,13 @@ def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Expecte
                 f = float(num)
                 return Ok(Float(f))
             except (ValueError, OverflowError) as _:
-                return Err(Expected(['float'], 'parse error'))
+                return Err(Expected(['float'], num))
         else:
             try:
                 i = int(num, 10)
                 return Ok(Integer(i))
             except (ValueError, OverflowError) as _:
-                return Err(Expected(['int'], 'parse error'))
+                return Err(Expected(['int'], num))
 
     elif char == '-':
         if next_char == '-':
@@ -206,11 +218,12 @@ def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Expecte
         else:
             integer = index.ok()
             if not isinstance(integer, Integer):
-                return Err(Expected(['integer'], integer.__class__.__name__))
+                return Err(Expected(['integer'], str(integer)))
             else:
                 return Ok(Placeholder(integer.value))
 
     else:
+        stream.ungetch()
         return Err(Expected(['token'], char))
 
 

@@ -26,13 +26,18 @@ class IdentifierBase(Token, metaclass=abc.ABCMeta):
         else:
             return f'{self.identifier}'
 
+    def __repr__(self):
+        return str(self)
+
     def __eq__(self, o: 'IdentifierBase') -> bool:
         return isinstance(o, self.__class__) and self.identifier.lower() == o.identifier.lower()
 
 
 class Identifier(IdentifierBase):
-    pass
+    def __repr__(self) -> str:
+        return f'Identifier( {super().__repr__()} )'
 
 
 class Reserved(IdentifierBase):
-    pass
+    def __repr__(self) -> str:
+        return f'Reserved( {super().__repr__()} )'
