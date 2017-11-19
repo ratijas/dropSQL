@@ -1,0 +1,51 @@
+from . import *
+
+from dropSQL.parser.expected import Expected
+from dropSQL.parser.tokens import *
+from dropSQL.generic import *
+
+from dropSQL.ast import CreateTable
+
+__all__ = (
+    'CreateStmt',
+)
+
+
+class CreateStmt(Rule[CreateTable]):
+    """
+    /create_stmt
+        : "/create" "table" existence /table_name "(" /columns_def ")" /drop
+        ;
+
+    """
+
+    @classmethod
+    def parse(cls, ts: TokenStream) -> Result[CreateTable, Expected]:
+        t = ts.gettok().and_then(caster(Create))
+        if t.is_err(): return Err(t.err())
+
+        t = ts.gettok().and_then(caster(Table))
+        if not t: return Err(t.err())
+
+        t = NonExistence.parse(ts)
+        if not t: return Err(Expected(['if', 'table name'], str(t)))
+        if_not_exists = t.ok()
+
+        t = ts.gettok().and_then(caster(Identifier))
+        if not t: return Err(Expected(['if', 'table name'], t.err().got))
+        name = t.ok()
+
+        t = ts.gettok().and_then(caster(LParen))
+        if not t: return Err(t.err())
+
+        columns = ColumnsDef.parse(ts)
+        if not columns: return Err(columns.err())
+        columns = columns.ok()
+
+        t = ts.gettok().and_then(caster(RParen))
+        if not t: return Err(t.err())
+
+        t = ts.gettok().and_then(caster(Drop))
+        if not t: return Err(t.err())
+
+        return Ok(CreateTable(if_not_exists, name, columns))

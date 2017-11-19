@@ -5,7 +5,7 @@ from dropSQL.parser.rules import *
 
 
 class TokenStreamTestCase(TestCase):
-    def test_basic(self):
+    def test(self):
         ts = TokenStream(Stream('/select 5 /drop'))
         # @formatter:off
         self.assertIsInstance(ts.gettok().ok(), Select)
