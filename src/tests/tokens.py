@@ -45,11 +45,9 @@ class TokensTestCase(TestCase):
         self.assertTrue(ident.slash)
 
         s = Stream('/file_id')
-        tok = next_token(s)
-        print('file id token')
-        print(tok)
-        tok = next_token(s)
-        print(tok)
+        tok = next_token(s).ok()
+        self.assertEqual(tok, Identifier('file_id'))
+        self.assertFalse(next_token(s))
 
     def test_next_token_consistent_error(self):
         s = Stream('file[id]')
@@ -154,3 +152,4 @@ class TokenStreamTestCase(TestCase):
     def test_broken(self):
         s = 'file[id]'
         ts = TokenStream(Stream(s))
+        self.assertNotEqual(ts.error.got, 'EOF')

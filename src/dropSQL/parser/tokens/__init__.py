@@ -233,7 +233,7 @@ def tok_identifier(stream: Stream, char: str) -> Token:
         char = stream.getch().ok_or(EOF)
 
     ident = ''
-    while char.isalnum():
+    while char.isalnum() or char == '_':
         ident += char
         char = stream.getch().ok_or(EOF)
     stream.ungetch()
