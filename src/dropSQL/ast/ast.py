@@ -9,4 +9,3 @@ class Ast(metaclass=abc.ABCMeta):
 
         :return: Serialized statement.
         """
-        ...

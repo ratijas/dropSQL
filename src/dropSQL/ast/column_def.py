@@ -1,5 +1,3 @@
-from dropSQL.parser.tokens import Identifier
-
 from . import *
 
 
@@ -17,4 +15,5 @@ class ColumnDef(Ast):
         sql += self.ty.to_sql()
         if self.is_primary_key:
             sql += ' /primary key'
+        sql += ','
         return sql
