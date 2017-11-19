@@ -21,31 +21,31 @@ class CreateStmt(Rule[CreateTable]):
 
     @classmethod
     def parse(cls, ts: TokenStream) -> Result[CreateTable, Expected]:
-        t = ts.gettok().and_then(caster(Create))
+        t = ts.gettok().and_then(cast(Create))
         if t.is_err(): return Err(t.err())
 
-        t = ts.gettok().and_then(caster(Table))
+        t = ts.gettok().and_then(cast(Table))
         if not t: return Err(t.err())
 
         t = NonExistence.parse(ts)
         if not t: return Err(Expected(['if', 'table name'], str(t)))
         if_not_exists = t.ok()
 
-        t = ts.gettok().and_then(caster(Identifier))
+        t = ts.gettok().and_then(cast(Identifier))
         if not t: return Err(Expected(['if', 'table name'], t.err().got))
         name = t.ok()
 
-        t = ts.gettok().and_then(caster(LParen))
+        t = ts.gettok().and_then(cast(LParen))
         if not t: return Err(t.err())
 
         columns = ColumnsDef.parse(ts)
         if not columns: return Err(columns.err())
         columns = columns.ok()
 
-        t = ts.gettok().and_then(caster(RParen))
+        t = ts.gettok().and_then(cast(RParen))
         if not t: return Err(t.err())
 
-        t = ts.gettok().and_then(caster(Drop))
+        t = ts.gettok().and_then(cast(Drop))
         if not t: return Err(t.err())
 
         return Ok(CreateTable(if_not_exists, name, columns))

@@ -36,23 +36,23 @@ class GenericTestCase(TestCase):
 
     def test_cast(self):
         i = 5
-        res = cast(i, float)
+        res = cast(float)(i)
         self.assertTrue(res.is_err())
         self.assertFalse(res)
 
         s = TokenStream(Stream('/drop'))
         tok = s.gettok().ok()  # type: Token
-        self.assertTrue(cast(tok, Reserved))
-        self.assertTrue(cast(tok, Drop))
-        self.assertFalse(cast(tok, Operator))
+        self.assertTrue(cast(Reserved)(tok))
+        self.assertTrue(cast(Drop)(tok))
+        self.assertFalse(cast(Operator)(tok))
 
     def test_caster(self):
-        cs = caster(int)
+        cs = cast(int)
         ok = cs(42)
         err = cs(0.3)
 
         self.assertTrue(ok)
         self.assertFalse(err)
 
-        err = caster(LParen)(Create())
+        err = cast(LParen)(Create())
         self.assertFalse(err)

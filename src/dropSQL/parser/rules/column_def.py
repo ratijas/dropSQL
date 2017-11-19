@@ -40,7 +40,7 @@ class ColumnDef(Rule[ast.ColumnDef]):
 
     @classmethod
     def parse(cls, ts: TokenStream) -> Result[ast.ColumnDef, Expected]:
-        t = ts.gettok().and_then(caster(Identifier))
+        t = ts.gettok().and_then(cast(Identifier))
         if not t:
             ts.ungettok()
             return Err(Expected(['column name'], t.err().got))
@@ -54,7 +54,7 @@ class ColumnDef(Rule[ast.ColumnDef]):
         if not t: return Err(t.err())
         is_primary_key = t.ok()
 
-        t = ts.gettok().and_then(caster(Comma))
+        t = ts.gettok().and_then(cast(Comma))
         if not t: return Err(t.err())
 
         return Ok(ast.ColumnDef(name, ty, is_primary_key))
@@ -70,12 +70,12 @@ class PrimaryKey(Rule[bool]):
 
     @classmethod
     def parse(cls, ts: TokenStream) -> Result[bool, Expected]:
-        t = ts.gettok().and_then(caster(Primary))
+        t = ts.gettok().and_then(cast(Primary))
         if not t:
             ts.ungettok()
             return Ok(False)
 
-        t = ts.gettok().and_then(caster(Key))
+        t = ts.gettok().and_then(cast(Key))
         if not t: return Err(t.err())
 
         return Ok(True)

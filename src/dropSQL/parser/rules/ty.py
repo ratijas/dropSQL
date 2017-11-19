@@ -22,7 +22,7 @@ class Ty(Rule[AstTy]):
 
     @classmethod
     def parse(cls, ts: TokenStream) -> Result[AstTy, Expected]:
-        t = ts.gettok().and_then(caster(Identifier))
+        t = ts.gettok().and_then(cast(Identifier))
         if not t: return Err(Expected(['integer', 'float', 'varchar'], t.err().got))
 
         t = t.ok()
@@ -41,15 +41,15 @@ class Ty(Rule[AstTy]):
 
     @classmethod
     def parse_varchar(cls, ts: TokenStream) -> Result[VarCharTy, Expected]:
-        t = ts.gettok().and_then(caster(LParen))
+        t = ts.gettok().and_then(cast(LParen))
         if not t: return Err(t.err())
 
-        t = ts.gettok().and_then(caster(Integer))
+        t = ts.gettok().and_then(cast(Integer))
         if not t: return Err(t.err())
 
         width = t.ok().value
 
-        t = ts.gettok().and_then(caster(RParen))
+        t = ts.gettok().and_then(cast(RParen))
         if not t: return Err(t.err())
 
         return Ok(VarCharTy(width))
