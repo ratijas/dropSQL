@@ -1,6 +1,6 @@
 from . import Rule
 
-from dropSQL.parser.expected import Expected
+from dropSQL.parser.expected import *
 from dropSQL.parser.tokens import *
 from dropSQL.generic import *
 
@@ -23,7 +23,7 @@ class Ty(Rule[AstTy]):
     @classmethod
     def parse(cls, ts: TokenStream) -> Result[AstTy, Expected]:
         t = ts.gettok().and_then(cast(Identifier))
-        if not t: return Err(Expected(['integer', 'float', 'varchar'], t.err().got))
+        if not t: return Err(t.err().set_expected(['integer', 'float', 'varchar']))
 
         t = t.ok()
 

@@ -1,6 +1,6 @@
 from . import *
 
-from dropSQL.parser.expected import Expected
+from dropSQL.parser.expected import *
 from dropSQL.parser.tokens import *
 from dropSQL.generic import *
 
@@ -22,17 +22,17 @@ class CreateStmt(Rule[CreateTable]):
     @classmethod
     def parse(cls, ts: TokenStream) -> Result[CreateTable, Expected]:
         t = ts.gettok().and_then(cast(Create))
-        if t.is_err(): return Err(t.err())
+        if not t: return Err(t.err())
 
         t = ts.gettok().and_then(cast(Table))
         if not t: return Err(t.err())
 
         t = NonExistence.parse(ts)
-        if not t: return Err(Expected(['if', 'table name'], str(t)))
+        if not t: return Err(t.err().set_expected(['if', 'table name']))
         if_not_exists = t.ok()
 
         t = ts.gettok().and_then(cast(Identifier))
-        if not t: return Err(Expected(['if', 'table name'], t.err().got))
+        if not t: return Err(t.err().set_expected(['if', 'table name']))
         name = t.ok()
 
         t = ts.gettok().and_then(cast(LParen))

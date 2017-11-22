@@ -1,6 +1,6 @@
 from typing import *
 
-from dropSQL.parser.expected import Expected
+from dropSQL.parser.expected import *
 from dropSQL.parser.tokens import *
 from dropSQL.generic import *
 
