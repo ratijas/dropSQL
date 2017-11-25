@@ -11,29 +11,31 @@ class AstTestCase(TestCase):
         self.assertEqual("'world'", ExpressionLiteralString('world').to_sql())
         self.assertEqual(r"'ab\\cd\'s'", ExpressionLiteralString(r"ab\cd's").to_sql())
         self.assertEqual('?42', ExpressionPlaceholder(42).to_sql())
-        self.assertEqual('/name', ExpressionReference(None, Identifier('name')).to_sql())
-        self.assertEqual('/person/name', ExpressionReference(Identifier('person'), Identifier('name')).to_sql())
-        self.assertEqual('(2 + 3) = 5', ExpressionBinary(
-            Operator('='),
-            ExpressionParen(
-                ExpressionBinary(
-                    Operator('+'),
-                    ExpressionLiteralInt(2),
-                    ExpressionLiteralInt(3),
-                )),
-            ExpressionLiteralInt(5),
-        ).to_sql())
+        self.assertEqual('name', ExpressionReference(None, Identifier('name')).to_sql())
+        self.assertEqual('person name', ExpressionReference(Identifier('person'), Identifier('name')).to_sql())
+        self.assertEqual('person/name', ExpressionReference(Identifier('person'), Identifier('name', True)).to_sql())
+        self.assertEqual('(2 + 3) = 5',
+                         ExpressionBinary(
+                             Operator('='),
+                             ExpressionParen(
+                                 ExpressionBinary(
+                                     Operator('+'),
+                                     ExpressionLiteralInt(2),
+                                     ExpressionLiteralInt(3))),
+                             ExpressionLiteralInt(5))
+                         .to_sql())
 
     def test_aliased(self):
         self.assertEqual('person', AliasedTable(Identifier('person')).to_sql())
         self.assertEqual('person /as p', AliasedTable(Identifier('person'), Identifier('p')).to_sql())
-        self.assertEqual('/height / 3 /as /h3',
+        self.assertEqual('height / 3 /as /h3',
                          AliasedExpression(
                              ExpressionBinary(
                                  Operator('/'),
                                  ExpressionReference(None, Identifier('height')),
                                  ExpressionLiteralInt(3),
-                             ), Identifier('h3', True)).to_sql())
+                             ), Identifier('h3', True))
+                         .to_sql())
 
     def test_types(self):
         self.assertEqual('float', FloatTy().to_sql())
@@ -50,7 +52,7 @@ class AstTestCase(TestCase):
 
     def test_result_column(self):
         self.assertEqual('*', ResultStar().to_sql())
-        self.assertEqual('/name /as n',
+        self.assertEqual('name /as n',
                          ResultExpression(
                              AliasedExpression(
                                  ExpressionReference(table=None, column=Identifier('name')),
@@ -109,17 +111,17 @@ class AstTestCase(TestCase):
         self.assertEqual(expected, sql)
 
     def test_delete_from(self):
-        self.assertEqual("/delete from /person /where /name = 'morty' /drop",
+        self.assertEqual("/delete from /person /where name = 'morty' /drop",
                          DeleteFrom(
                              Identifier('person', True),
                              ExpressionBinary(
                                  Operator('='),
                                  ExpressionReference(None, Identifier('name')),
-                                 ExpressionLiteralString('morty'),
-                             )).to_sql())
+                                 ExpressionLiteralString('morty')))
+                         .to_sql())
 
     def test_update_set(self):
-        self.assertEqual("/update /person /set name = ?1, age = ?2 /where /height > 100 /drop",
+        self.assertEqual('/update /person /set name = ?1, age = ?2 /where height > 100 /drop',
                          UpdateSet(
                              Identifier('person', True),
                              [
@@ -129,6 +131,44 @@ class AstTestCase(TestCase):
                              ExpressionBinary(
                                  Operator('>'),
                                  ExpressionReference(None, Identifier('height')),
-                                 ExpressionLiteralInt(100),
-                             )
-                         ).to_sql())
+                                 ExpressionLiteralInt(100)))
+                         .to_sql())
+
+    def test_select_from(self):
+        self.assertEqual('/select P/name /as first_name, * /from person /as P /drop',
+                         SelectFrom(
+                             columns=[
+                                 ResultExpression(
+                                     AliasedExpression(
+                                         ExpressionReference(
+                                             Identifier('P'),
+                                             Identifier('name', True)),
+                                         Identifier('first_name'))),
+                                 ResultStar(),
+                             ],
+                             table=AliasedTable(Identifier('person'), Identifier('P')))
+                         .to_sql())
+
+        self.assertEqual(
+            '/select * /from person /as P, department /as D /join manager /as M /on M/department_id = D/id /drop',
+            SelectFrom(
+                columns=[ResultStar()],
+                table=AliasedTable(Identifier('person'), Identifier('P')),
+                joins=[
+                    CrossJoin(AliasedTable(Identifier('department'), Identifier('D'))),
+                    InnerJoin(AliasedTable(Identifier('manager'), Identifier('M')),
+                              ExpressionBinary(
+                                  Operator('='),
+                                  ExpressionReference(Identifier('M'), Identifier('department_id', True)),
+                                  ExpressionReference(Identifier('D'), Identifier('id', True)))),
+                ]).to_sql())
+
+        self.assertEqual('/select * /from person /as P /where P/age >= 18 /drop',
+                         SelectFrom(
+                             columns=[ResultStar()],
+                             table=AliasedTable(Identifier('person'), Identifier('P')),
+                             where=ExpressionBinary(
+                                 Operator('>='),
+                                 ExpressionReference(Identifier('P'), Identifier('age', True)),
+                                 ExpressionLiteralInt(18)))
+                         .to_sql())

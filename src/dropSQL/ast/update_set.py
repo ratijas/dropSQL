@@ -3,7 +3,7 @@ from typing import *
 from . import *
 
 
-class UpdateSet(Ast):
+class UpdateSet(Ast, AstStmt):
     def __init__(self,
                  table: Identifier,
                  assign: List[Tuple[Identifier, Expression]],

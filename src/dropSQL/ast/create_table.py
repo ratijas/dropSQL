@@ -3,7 +3,7 @@ from typing import *
 from . import *
 
 
-class CreateTable(Ast):
+class CreateTable(Ast, AstStmt):
     def __init__(self, if_not_exists: Optional[IfNotExists], table: Identifier, columns: List[ColumnDef]) -> None:
         super().__init__()
 

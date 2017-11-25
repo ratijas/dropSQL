@@ -3,7 +3,7 @@ from typing import *
 from . import *
 
 
-class DeleteFrom(Ast):
+class DeleteFrom(Ast, AstStmt):
     def __init__(self, table: Identifier, where: Optional[Expression]) -> None:
         super().__init__()
 

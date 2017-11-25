@@ -76,15 +76,15 @@ class ExpressionReference(Expression):
     def __init__(self, table: Optional[Identifier], column: Identifier) -> None:
         super().__init__()
 
-        if table is not None:
-            table = Identifier(table.identifier, True)
         self.table = table
-        self.column = Identifier(column.identifier, True)
+        self.column = column
 
     def to_sql(self) -> str:
         s = ''
         if self.table is not None:
             s += str(self.table)
+            if not self.column.slash:
+                s += ' '
         s += str(self.column)
         return s
 

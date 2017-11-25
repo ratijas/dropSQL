@@ -3,7 +3,7 @@ from typing import *
 from . import *
 
 
-class DropTable(Ast):
+class DropTable(Ast, AstStmt):
     def __init__(self, if_exists: Optional[IfExists], table: Identifier) -> None:
         super().__init__()
 

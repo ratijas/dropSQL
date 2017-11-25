@@ -3,7 +3,7 @@ from typing import *
 from . import *
 
 
-class InsertInto(Ast):
+class InsertInto(Ast, AstStmt):
     def __init__(self, table: Identifier, columns: List[Identifier], values: List[List[Expression]]) -> None:
         super().__init__()
 
