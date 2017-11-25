@@ -1,2 +1,0 @@
-class Column:
-    pass

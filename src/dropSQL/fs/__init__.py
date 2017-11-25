@@ -46,7 +46,6 @@ enum Id: i32
 
 Pointer[Block]: i32
     # block number in file starting with Meta block at index 0
-"""
 
 from typing import *
 
@@ -91,3 +90,6 @@ if __name__ == '__main__':
     res = students.add_column(col)
     if res.is_err():
         print(f'can not add column {col.name}')
+"""
+
+__version__ = "0.00001"

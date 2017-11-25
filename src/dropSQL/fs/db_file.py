@@ -3,38 +3,44 @@ Class for db file i/o
 """
 
 import os
-from dropSQL.fs.metadata import Metadata
+import sys
+
+from dropSQL.fs.block import Block
 
 
 class DBFile:
     def __init__(self, filename):
-        self.db_file = self.setup_with_file(filename)
-        self._read_metadata()
-        self._read_table_descriptors()
+        self.filename = filename
+        self.file = open(filename, "r+b")
+        self.file.write(b'\0' * 4096 * 17)
 
-    def setup_with_file(self, filename):
-        if os.path.exists(filename):
-            return self._open_database(filename)
-        else:
-            return self._create_database(filename)
+    def get_metadata(self):
+        from dropSQL.fs.metadata import Metadata
+        return Metadata(self)
 
-    @staticmethod
-    def _create_database(filename):
-        db_file = open(filename, "r+b")
+    def get_tables(self) -> list:
+        from dropSQL.fs.table import Table
+        return [Table(self, i) for i in range(0, 16)]
 
-        return db_file
+    def read_block(self, block_num) -> Block:
+        self.file.seek(4096 * block_num)
+        try:
+            data = Block(self.file.read(4096))
+        except AssertionError:
+            raise AssertionError("Block " + str(block_num) + " does not exist")
+        return data
 
-    @staticmethod
-    def _open_database(filename):
-        db_file = open(filename, "r+b")
-        return db_file
+    def write_block(self, block_num: int, block: Block):
+        self.file.seek(4096 * block_num)
+        self.file.write(block.data)
 
-    def _read_metadata(self):
-        metadata_block = self._read_block(0)
-        self.metadata = Metadata(metadata_block)
+    def allocate_block(self) -> int:
+        self.file.seek(0, 2)  # eof
+        self.file.write(b'\0' * 4096)
+        c = self.get_metadata().get_data_blocks_count()
+        self.get_metadata().set_data_blocks_count(c + 1)
+        return c + 16
 
-    def _read_table_descriptors(self):
-        pass
-
-    def _read_block(self, block_num):
-        pass
+    def close(self):
+        self.file.flush()
+        self.file.close()
