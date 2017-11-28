@@ -1,16 +1,17 @@
 from typing import *
 
-__all__ = (
+__all__ = [
     'Expected',
-    'EOF',
-)
+    'Incomplete',
+]
 
 
 class Expected:
     """
     Error which represents expectations about parser's input, and
     the description of what was actually found. On the other hand,
-    if nothing was found at all, consider using the `EOF` subclass.
+    if input is incomplete (or no input at all as a special case),
+    consider using the `Incomplete` subclass instead.
     """
     __slots__ = ('_expected', '_got')
 
@@ -32,8 +33,8 @@ class Expected:
     def got(self) -> str:
         return self._got
 
-    def eof(self) -> bool:
-        """ Is this an EOF kind of error? """
+    def incomplete(self) -> bool:
+        """ Is this an Incomplete kind of error? """
         return False
 
     def __str__(self) -> str:
@@ -46,12 +47,12 @@ class Expected:
         return f'Expected( {repr(self._expected)}, {repr(self.got())} )'
 
 
-class EOF(Expected):
-    """ Specific `Expected` subclass for EOF case. """
+class Incomplete(Expected):
+    """ Specific `Expected` subclass for Incomplete case. """
     __slots__ = ()
 
     def __init__(self, expected: List[str]) -> None:
         super().__init__(expected, 'EOF')
 
-    def eof(self) -> bool:
+    def incomplete(self) -> bool:
         return True
