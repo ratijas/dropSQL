@@ -73,8 +73,16 @@ class Stream(Generic[T], metaclass=abc.ABCMeta):
         return res
 
     def peek(self) -> IResult[T]:
+        current = self._current
+        cursor = self.cursor
+        err = self.err
+
         res = self.next()
-        if res: self.back()
+
+        self._current = current
+        self.cursor = cursor
+        self.err = err
+
         return res
 
     def back(self, n: int = 1) -> None:
