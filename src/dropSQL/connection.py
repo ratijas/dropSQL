@@ -1,3 +1,5 @@
+from .ast import *
+
 MEMORY = ':memory:'
 
 
@@ -17,5 +19,5 @@ class Connection:
         else:
             return f'a persistent database in {self.path}'
 
-    def execute(self, query):
-        pass
+    def execute(self, query: AstStmt):
+        print(query.to_sql())

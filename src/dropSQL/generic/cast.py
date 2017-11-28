@@ -1,23 +1,22 @@
 from typing import *
 
-from dropSQL.parser.expected import *
+from .error import *
 from .result import *
+from .typevar import *
 
 __all__ = ['Cast']
 
-T = TypeVar('T')
-
 
 # noinspection PyPep8Naming
-def Cast(ty: Type[T]) -> Callable[[Any], Result[T, Expected]]:
+def Cast(ty: Type[T]) -> Callable[[Any], IResult[T]]:
     """
     Abstraction over builtin `isinstance` using `Result`.
     """
 
-    def inner(o: Any) -> Result[T, Expected]:
+    def inner(o: Any) -> IResult[T]:
         if isinstance(o, ty):
             return Ok(o)
         else:
-            return Err(Expected([str(ty)], str(o)))
+            return Err(Syntax(ty.__name__, str(o)))
 
     return inner

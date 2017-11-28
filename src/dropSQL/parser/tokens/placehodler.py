@@ -1,4 +1,4 @@
-from . import *
+from .token import Token
 
 
 class Placeholder(Token):
@@ -8,7 +8,7 @@ class Placeholder(Token):
         self.index = index
 
     def __repr__(self) -> str:
-        return f'Token( ?{str(self.index)} )'
+        return f'Token(?{str(self.index)})'
 
-    def __eq__(self, o: 'Placeholder') -> bool:
+    def __eq__(self, o: object) -> bool:
         return isinstance(o, Placeholder) and self.index == o.index

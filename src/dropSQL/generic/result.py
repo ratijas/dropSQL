@@ -1,79 +1,89 @@
+import abc
 from typing import *
+
+from .error import Error
+from .typevar import *
 
 __all__ = [
     'Result',
     'Ok',
     'Err',
+
+    'IResult',
+    'IOk',
+    'IErr',
 ]
 
-T = TypeVar('T')
-E = TypeVar('E')
-U = TypeVar('U')
 
+class Result(Generic[T, E], metaclass=abc.ABCMeta):
+    """
+    enum Result<T> {
+        Ok(T),
+        Err(E),
+    }
+    """
 
-class Result(Generic[T, E]):
-    def is_ok(self) -> bool: raise NotImplementedError
+    def is_ok(self) -> bool:
+        return isinstance(self, Ok)
 
-    def is_err(self) -> bool: raise NotImplementedError
+    def is_err(self) -> bool:
+        return isinstance(self, Err)
 
-    def ok(self) -> T: raise NotImplementedError
+    def ok(self) -> T:
+        raise NotImplementedError
 
-    def ok_or(self, default: T) -> T: raise NotImplementedError
+    def err(self) -> E:
+        raise NotImplementedError
 
-    def err(self) -> E: raise NotImplementedError
+    def ok_or(self, default: T) -> T:
+        return default
 
-    def map(self, f: Callable[[T], U]) -> 'Result[U, E]': raise NotImplementedError
+    def err_or(self, default: E) -> E:
+        return default
 
-    def map_err(self, f: Callable[[E], U]) -> 'Result[T, U]': raise NotImplementedError
+    def map(self, f: Callable[[T], U]) -> 'Result[U, E]':
+        if isinstance(self, Ok):
+            return Ok(f(self.ok()))
+        else:
+            return Err(self.err())
 
-    def and_then(self, f: Callable[[T], 'Result[U, E]']) -> 'Result[U, E]': raise NotImplementedError
+    def and_then(self, f: Callable[[T], 'Result[U, E]']) -> 'Result[U, E]':
+        if isinstance(self, Ok):
+            return f(self.ok())
+        else:
+            return Err(self.err())
 
-    def __bool__(self) -> bool: return self.is_ok()
-
-    def __repr__(self) -> str: raise NotImplementedError
+    def __bool__(self) -> bool:
+        return self.is_ok()
 
 
 class Ok(Generic[T, E], Result[T, E]):
     def __init__(self, ok: T) -> None:
-        self._ok: T = ok
+        self._ok = ok
 
-    def is_ok(self) -> bool: return True
+    def ok(self) -> T:
+        return self._ok
 
-    def is_err(self) -> bool: return False
+    def ok_or(self, default: T) -> T:
+        return self.ok()
 
-    def ok(self) -> T: return self._ok
-
-    def err(self) -> E: raise NotImplementedError(f'called `Result.err()` on an `Ok` value {self._ok}')
-
-    def ok_or(self, default: T) -> T: return self.ok()
-
-    def map(self, f: Callable[[T], U]) -> 'Result[U, E]': return Ok(f(self._ok))
-
-    def map_err(self, f: Callable[[E], U]) -> 'Result[T, U]': return Ok(self._ok)
-
-    def and_then(self, f: Callable[[T], 'Result[U, E]']) -> 'Result[U, E]': return f(self._ok)
-
-    def __repr__(self) -> str: return f'Result.Ok( {repr(self._ok)} )'
+    def __repr__(self) -> str: return f'Result::Ok({self._ok!r})'
 
 
 class Err(Generic[T, E], Result[T, E]):
-    def __init__(self, err: E) -> None:
-        self._err: E = err
+    def __init__(self, error: E) -> None:
+        self._err = error
 
-    def is_ok(self) -> bool: return False
+    def err(self) -> E:
+        return self._err
 
-    def is_err(self) -> bool: return True
+    def err_or(self, default: E) -> E:
+        return self.err()
 
-    def ok(self) -> T: raise NotImplementedError(f'called `Result.ok()` on an `Err` value {self._err}')
+    def __repr__(self) -> str: return f'Result::Err({self._err!r})'
 
-    def err(self) -> E: return self._err
 
-    def ok_or(self, default: T) -> T: return default
-
-    def map(self, f: Callable[[T], U]) -> 'Result[U, E]': return Err(self._err)
-
-    def map_err(self, f: Callable[[E], U]) -> 'Result[T, U]': return Err(f(self._err))
-
-    def and_then(self, f: Callable[[T], 'Result[U, E]']) -> 'Result[U, E]': return Err(self._err)
-
-    def __repr__(self) -> str: return f'Result.Err( {repr(self._err)} )'
+# stream-specific result type alias
+IResult = Result[T, Error]
+IOk = Ok[T, Error]
+IErr = Err[T, Error]

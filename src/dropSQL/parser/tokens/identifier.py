@@ -1,12 +1,12 @@
 import abc
 
-from . import *
+from .token import Token
 
-__all__ = (
+__all__ = [
     'IdentifierBase',
     'Identifier',
-    'Reserved',
-)
+    'Keyword',
+]
 
 
 class IdentifierBase(Token, metaclass=abc.ABCMeta):
@@ -26,18 +26,24 @@ class IdentifierBase(Token, metaclass=abc.ABCMeta):
         else:
             return f'{self.identifier}'
 
-    def __repr__(self):
-        return str(self)
-
-    def __eq__(self, o: 'IdentifierBase') -> bool:
-        return isinstance(o, self.__class__) and self.identifier.lower() == o.identifier.lower()
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, type(self)) and self.identifier.lower() == o.identifier.lower()
 
 
 class Identifier(IdentifierBase):
     def __repr__(self) -> str:
-        return f'Identifier( {super().__repr__()} )'
+        return f'Identifier({super().__repr__()})'
+
+    def maybe_as_keyword(self) -> Token:
+        from .ident_to_keyword import KEYWORDS
+        keyword = KEYWORDS.get(self.identifier.lower(), None)
+        if keyword is not None:
+            return keyword
+
+        else:
+            return self
 
 
-class Reserved(IdentifierBase):
+class Keyword(IdentifierBase):
     def __repr__(self) -> str:
-        return f'Reserved( {super().__repr__()} )'
+        return f'Keyword({super().__repr__()})'

@@ -1,5 +1,7 @@
+from io import StringIO
 from unittest import TestCase
 
+from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
 
 
@@ -9,25 +11,25 @@ class TokensTestCase(TestCase):
         self.assertEqual('/drop', str(ident))
 
     def test_eof(self):
-        s = Stream('')
-        tok = next_token(s)
+        s = Characters(StringIO(''))
+        tok = s.next()
         self.assertTrue(tok.is_err())
-        self.assertTrue(tok.err().eof())
+        self.assertTrue(tok.err())
 
     def test_punctuation(self):
-        s = Stream('( , )')
-        tok = next_token(s).ok()
+        s = Tokens(Characters(StringIO('( , )')))
+        tok = s.next().ok()
         self.assertIsInstance(tok, LParen)
-        tok = next_token(s).ok()
+        tok = s.next().ok()
         self.assertIsInstance(tok, Comma)
-        tok = next_token(s).ok()
+        tok = s.next().ok()
         self.assertIsInstance(tok, RParen)
-        tok = next_token(s)
-        self.assertTrue(tok.is_err())
+        res = s.next()
+        self.assertFalse(res)
 
     def test_more_identifiers(self):
-        s = Stream('/create table if not exists /students /drop')
-        n = lambda: next_token(s).ok()
+        s = Tokens(Characters(StringIO('/create table if not exists /students /drop')))
+        n = lambda: s.next().ok()
 
         tok = (n(), n(), n(), n(), n(), n(), n())
         self.assertIsInstance(tok[0], Create)
@@ -42,49 +44,52 @@ class TokensTestCase(TestCase):
         self.assertEqual(ident.identifier, 'students')
         self.assertTrue(ident.slash)
 
-        s = Stream('/file_id')
-        tok = next_token(s).ok()
+        s = Tokens(Characters(StringIO('/file_id')))
+        tok = s.next().ok()
         self.assertEqual(tok, Identifier('file_id'))
-        self.assertFalse(next_token(s))
+        self.assertFalse(s.next())
 
     def test_next_token_consistent_error(self):
-        s = Stream('file[id]')
-        res = next_token(s)
+        # FIXME
+        s = Tokens(Characters(StringIO('file[id]')))
+        res = s.next()
         self.assertTrue(res)
-        res = next_token(s)
+        print('A' * 100)
+        res = s.next()
+        print('res:', res)
         self.assertFalse(res)
-        self.assertEqual(res.err().got(), '[')
-        res = next_token(s)
+        self.assertEqual(res.err().got, '[')
+        res = s.next()
         self.assertFalse(res)
 
     def test_literals(self):
-        s = Stream('42 15.37 \'UFO\'')
+        s = Tokens(Characters(StringIO('42 15.37 \'UFO\'')))
 
-        tok = next_token(s).ok()
+        tok = s.next().ok()
         self.assertIsInstance(tok, Integer)
         self.assertEqual(42, tok.value)
 
-        tok = next_token(s).ok()
+        tok = s.next().ok()
         self.assertIsInstance(tok, Float)
         self.assertAlmostEqual(15.37, tok.value, 2)
 
-        tok = next_token(s).ok()
-        self.assertIsInstance(tok, String)
+        tok = s.next().ok()
+        self.assertIsInstance(tok, VarChar)
         self.assertEqual('UFO', tok.value)
 
-        s = Stream(' \'not the...')
-        tok = next_token(s)
+        s = Tokens(Characters(StringIO(' \'not the...')))
+        tok = s.next()
         self.assertTrue(tok.is_err())
 
-        s = Stream(" 'abc\\' def' ")
-        tok = next_token(s).ok()
-        self.assertEqual(tok, String("abc' def"))
+        s = Tokens(Characters(StringIO(" 'abc\\' def' ")))
+        tok = s.next().ok()
+        self.assertEqual(tok, VarChar("abc' def"))
 
     def test_comment(self):
-        s = Stream('42, -- this is the answer\n'
-                   '37  -- while this one is definitely not.\n')
-        n = lambda: next_token(s).ok()
-        tok = (n(), n(), n(), next_token(s))
+        s = Tokens(Characters(StringIO('42, -- this is the answer\n'
+                                       '37  -- while this one is definitely not.\n')))
+        n = lambda: s.next().ok()
+        tok = (n(), n(), n(), s.next())
 
         self.assertEqual(tok[0], Integer(42))
         self.assertIsInstance(tok[1], Comma)
@@ -92,9 +97,9 @@ class TokensTestCase(TestCase):
         self.assertTrue(tok[3].is_err())
 
     def test_operators(self):
-        s = Stream(
-            '  *    >=   >    /=   /    /5        /and')
-        n = lambda: next_token(s).ok()
+        s = Tokens(Characters(StringIO(
+            '  *    >=   >    /=   /    /5        /and')))
+        n = lambda: s.next().ok()
 
         tok = (n(), n(), n(), n(), n(), n(), n(), n())
         self.assertEqual(tok[0], Operator('*'))
@@ -107,9 +112,9 @@ class TokensTestCase(TestCase):
         self.assertEqual(tok[7], Operator('/and'))
 
     def test_placeholder(self):
-        s = Stream('?1, ?32 ? 4')
-        n = lambda: next_token(s).ok()
-        tok = (n(), n(), n(), next_token(s))
+        s = Tokens(Characters(StringIO('?1, ?32 ? 4')))
+        n = lambda: s.next().ok()
+        tok = (n(), n(), n(), s.next())
 
         self.assertEqual(tok[0], Placeholder(1))
         self.assertIsInstance(tok[1], Comma)
@@ -117,37 +122,33 @@ class TokensTestCase(TestCase):
         self.assertTrue(tok[3].is_err())
 
     def test_all_keywords(self):
+        def next_token(s: str) -> Token:
+            return Tokens(Characters(StringIO(s))).next().ok()
+
         # @formatter:off
-        self.assertIsInstance(next_token(Stream('and')).ok(),        Operator)
-        self.assertIsInstance(next_token(Stream('as')).ok(),         As)
-        self.assertIsInstance(next_token(Stream('create')).ok(),     Create)
-        self.assertIsInstance(next_token(Stream('delete')).ok(),     Delete)
-        self.assertIsInstance(next_token(Stream('drop')).ok(),       Drop)
-        self.assertIsInstance(next_token(Stream('exists')).ok(),     Exists)
-        self.assertIsInstance(next_token(Stream('float')).ok(),      Identifier)
-        self.assertIsInstance(next_token(Stream('from')).ok(),       From)
-        self.assertIsInstance(next_token(Stream('if')).ok(),         If)
-        self.assertIsInstance(next_token(Stream('insert')).ok(),     Insert)
-        self.assertIsInstance(next_token(Stream('integer')).ok(),    Identifier)
-        self.assertIsInstance(next_token(Stream('into')).ok(),       Into)
-        self.assertIsInstance(next_token(Stream('join')).ok(),       Join)
-        self.assertIsInstance(next_token(Stream('key')).ok(),        Key)
-        self.assertIsInstance(next_token(Stream('not')).ok(),        Not)
-        self.assertIsInstance(next_token(Stream('on')).ok(),         On)
-        self.assertIsInstance(next_token(Stream('or')).ok(),         Operator)
-        self.assertIsInstance(next_token(Stream('primary')).ok(),    Primary)
-        self.assertIsInstance(next_token(Stream('select')).ok(),     Select)
-        self.assertIsInstance(next_token(Stream('set')).ok(),        Set)
-        self.assertIsInstance(next_token(Stream('table')).ok(),      Table)
-        self.assertIsInstance(next_token(Stream('update')).ok(),     Update)
-        self.assertIsInstance(next_token(Stream('values')).ok(),     Values)
-        self.assertIsInstance(next_token(Stream('varchar')).ok(),    Identifier)
-        self.assertIsInstance(next_token(Stream('where')).ok(),      Where)
+        self.assertIsInstance(next_token('and'),        Operator)
+        self.assertIsInstance(next_token('as'),         As)
+        self.assertIsInstance(next_token('create'),     Create)
+        self.assertIsInstance(next_token('delete'),     Delete)
+        self.assertIsInstance(next_token('drop'),       Drop)
+        self.assertIsInstance(next_token('exists'),     Exists)
+        self.assertIsInstance(next_token('float'),      Identifier)
+        self.assertIsInstance(next_token('from'),       From)
+        self.assertIsInstance(next_token('if'),         If)
+        self.assertIsInstance(next_token('insert'),     Insert)
+        self.assertIsInstance(next_token('integer'),    Identifier)
+        self.assertIsInstance(next_token('into'),       Into)
+        self.assertIsInstance(next_token('join'),       Join)
+        self.assertIsInstance(next_token('key'),        Key)
+        self.assertIsInstance(next_token('not'),        Not)
+        self.assertIsInstance(next_token('on'),         On)
+        self.assertIsInstance(next_token('or'),         Operator)
+        self.assertIsInstance(next_token('primary'),    Primary)
+        self.assertIsInstance(next_token('select'),     Select)
+        self.assertIsInstance(next_token('set'),        SetKw)
+        self.assertIsInstance(next_token('table'),      Table)
+        self.assertIsInstance(next_token('update'),     Update)
+        self.assertIsInstance(next_token('values'),     Values)
+        self.assertIsInstance(next_token('varchar'),    Identifier)
+        self.assertIsInstance(next_token('where'),      Where)
         # @formatter:on
-
-
-class TokenStreamTestCase(TestCase):
-    def test_broken(self):
-        s = 'file[id]'
-        ts = TokenStream(Stream(s))
-        self.assertFalse(ts.error.eof())

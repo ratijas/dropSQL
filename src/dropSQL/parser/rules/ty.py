@@ -1,10 +1,7 @@
-from . import Rule
-
-from dropSQL.parser.expected import *
-from dropSQL.parser.tokens import *
-from dropSQL.generic import *
-
 from dropSQL.ast import Ty as AstTy, IntegerTy, FloatTy, VarCharTy
+from dropSQL.generic import *
+from dropSQL.parser.tokens import *
+from . import Rule
 
 __all__ = (
     'Ty',
@@ -22,7 +19,7 @@ class Ty(Rule[AstTy]):
 
     @classmethod
     def parse(cls, ts: TokenStream) -> Result[AstTy, Expected]:
-        t = ts.gettok().and_then(cast(Identifier))
+        t = ts.next().and_then(Cast(Identifier))
         if not t: return Err(t.err().set_expected(['integer', 'float', 'varchar']))
 
         t = t.ok()
@@ -41,15 +38,15 @@ class Ty(Rule[AstTy]):
 
     @classmethod
     def parse_varchar(cls, ts: TokenStream) -> Result[VarCharTy, Expected]:
-        t = ts.gettok().and_then(cast(LParen))
+        t = ts.next().and_then(Cast(LParen))
         if not t: return Err(t.err())
 
-        t = ts.gettok().and_then(cast(Integer))
+        t = ts.next().and_then(Cast(Integer))
         if not t: return Err(t.err())
 
         width = t.ok().value
 
-        t = ts.gettok().and_then(cast(RParen))
+        t = ts.next().and_then(Cast(RParen))
         if not t: return Err(t.err())
 
         return Ok(VarCharTy(width))

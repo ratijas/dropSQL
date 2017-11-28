@@ -2,9 +2,8 @@ import abc
 from typing import *
 
 from dropSQL.ast import Ast
-from dropSQL.parser.expected import *
-from dropSQL.parser.tokens import TokenStream
 from dropSQL.generic import *
+from dropSQL.parser.tokens import TokenStream
 
 T = TypeVar('T', bound=Ast)
 

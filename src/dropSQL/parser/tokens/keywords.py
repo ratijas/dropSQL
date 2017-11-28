@@ -1,124 +1,124 @@
-from . import *
+from .identifier import Keyword
 
-__all__ = (
+__all__ = [
     'As',
     'Create',
-    'Drop',
     'Delete',
-    'Select',
-    'From',
-    'Join',
-    'On',
-    'Table',
-    'If',
-    'Not',
+    'Drop',
     'Exists',
-    'Primary',
-    'Key',
+    'From',
+    'If',
     'Insert',
     'Into',
+    'Join',
+    'Key',
+    'Not',
+    'On',
+    'Primary',
+    'Select',
+    'SetKw',
+    'Table',
     'Update',
-    'Set',
     'Values',
     'Where',
-)
+]
 
 
-class As(Reserved):
+class As(Keyword):
     def __init__(self) -> None:
         super().__init__('as', True)
 
 
-class Create(Reserved):
+class Create(Keyword):
     def __init__(self) -> None:
         super().__init__('create', True)
 
 
-class Drop(Reserved):
+class Drop(Keyword):
     def __init__(self) -> None:
         super().__init__('drop', True)
 
 
-class Delete(Reserved):
+class Delete(Keyword):
     def __init__(self) -> None:
         super().__init__('delete', True)
 
 
-class Select(Reserved):
+class Select(Keyword):
     def __init__(self) -> None:
         super().__init__('select', True)
 
 
-class From(Reserved):
+class From(Keyword):
     def __init__(self) -> None:
         super().__init__('from', False)
 
 
-class Join(Reserved):
+class Join(Keyword):
     def __init__(self) -> None:
         super().__init__('join', True)
 
 
-class On(Reserved):
+class On(Keyword):
     def __init__(self) -> None:
         super().__init__('on', True)
 
 
-class Table(Reserved):
+class Table(Keyword):
     def __init__(self) -> None:
         super().__init__('table', False)
 
 
-class If(Reserved):
+class If(Keyword):
     def __init__(self) -> None:
         super().__init__('if', False)
 
 
-class Not(Reserved):
+class Not(Keyword):
     def __init__(self) -> None:
         super().__init__('not', False)
 
 
-class Exists(Reserved):
+class Exists(Keyword):
     def __init__(self) -> None:
         super().__init__('exists', False)
 
 
-class Primary(Reserved):
+class Primary(Keyword):
     def __init__(self) -> None:
         super().__init__('primary', True)
 
 
-class Key(Reserved):
+class Key(Keyword):
     def __init__(self) -> None:
         super().__init__('key', False)
 
 
-class Insert(Reserved):
+class Insert(Keyword):
     def __init__(self) -> None:
         super().__init__('insert', True)
 
 
-class Into(Reserved):
+class Into(Keyword):
     def __init__(self) -> None:
         super().__init__('into', False)
 
 
-class Update(Reserved):
+class Update(Keyword):
     def __init__(self) -> None:
         super().__init__('update', True)
 
 
-class Set(Reserved):
+class SetKw(Keyword):
     def __init__(self) -> None:
         super().__init__('set', True)
 
 
-class Values(Reserved):
+class Values(Keyword):
     def __init__(self) -> None:
         super().__init__('values', False)
 
 
-class Where(Reserved):
+class Where(Keyword):
     def __init__(self) -> None:
         super().__init__('where', True)

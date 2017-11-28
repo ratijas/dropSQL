@@ -1,11 +1,8 @@
 from typing import *
 
-from dropSQL.parser.expected import *
-from dropSQL.parser.tokens import *
-from dropSQL.generic import *
-
 from dropSQL.ast import *
-
+from dropSQL.generic import *
+from dropSQL.parser.tokens import *
 from . import *
 
 __all__ = (
@@ -24,12 +21,12 @@ class Existence(Rule[Optional[IfExists]]):
 
     @classmethod
     def parse(cls, ts: TokenStream) -> Result[Optional[IfExists], Expected]:
-        t = ts.gettok().and_then(cast(If))
+        t = ts.next().and_then(Cast(If))
         if not t:
-            ts.ungettok()
+            ts.undo()
             return Ok(None)
 
-        t = ts.gettok().and_then(cast(Exists))
+        t = ts.next().and_then(Cast(Exists))
         if not t: return Err(t.err())
 
         return Ok(IfExists())
@@ -45,15 +42,15 @@ class NonExistence(Rule[Optional[IfNotExists]]):
 
     @classmethod
     def parse(cls, ts: TokenStream) -> Result[Optional[IfNotExists], Expected]:
-        t = ts.gettok().and_then(cast(If))
+        t = ts.next().and_then(Cast(If))
         if not t:
-            ts.ungettok()
+            ts.undo()
             return Ok(None)
 
-        t = ts.gettok().and_then(cast(Not))
+        t = ts.next().and_then(Cast(Not))
         if not t: return Err(t.err())
 
-        t = ts.gettok().and_then(cast(Exists))
+        t = ts.next().and_then(Cast(Exists))
         if not t: return Err(t.err())
 
         return Ok(IfNotExists())
