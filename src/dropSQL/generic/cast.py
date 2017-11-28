@@ -1,6 +1,6 @@
 from typing import *
 
-from ..parser.expected import Expected
+from dropSQL.parser.expected import *
 from .result import *
 
 __all__ = (

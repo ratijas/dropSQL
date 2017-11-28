@@ -2,7 +2,7 @@ import abc
 from typing import *
 
 from dropSQL.ast import Ast
-from dropSQL.parser.expected import Expected
+from dropSQL.parser.expected import *
 from dropSQL.parser.tokens import TokenStream
 from dropSQL.generic import *
 

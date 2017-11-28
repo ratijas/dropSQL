@@ -1,6 +1,5 @@
 from unittest import TestCase
 
-from dropSQL.parser.expected import Expected
 from dropSQL.parser.tokens import *
 
 
@@ -13,8 +12,7 @@ class TokensTestCase(TestCase):
         s = Stream('')
         tok = next_token(s)
         self.assertTrue(tok.is_err())
-        self.assertIsInstance(tok.err(), Expected)
-        self.assertEqual(tok.err().got, 'EOF')
+        self.assertTrue(tok.err().eof())
 
     def test_punctuation(self):
         s = Stream('( , )')
@@ -55,7 +53,7 @@ class TokensTestCase(TestCase):
         self.assertTrue(res)
         res = next_token(s)
         self.assertFalse(res)
-        self.assertEqual(res.err().got, '[')
+        self.assertEqual(res.err().got(), '[')
         res = next_token(s)
         self.assertFalse(res)
 
@@ -152,4 +150,4 @@ class TokenStreamTestCase(TestCase):
     def test_broken(self):
         s = 'file[id]'
         ts = TokenStream(Stream(s))
-        self.assertNotEqual(ts.error.got, 'EOF')
+        self.assertFalse(ts.error.eof())

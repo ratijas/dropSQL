@@ -9,3 +9,9 @@ class Ast(metaclass=abc.ABCMeta):
 
         :return: Serialized statement.
         """
+
+
+class AstStmt(metaclass=abc.ABCMeta):
+    """
+    Statement mix-in for Ast subclasses
+    """

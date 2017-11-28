@@ -1,7 +1,7 @@
 from typing import *
 
 from dropSQL import ast
-from dropSQL.parser.expected import Expected
+from dropSQL.parser.expected import *
 from dropSQL.parser.tokens import *
 from dropSQL.generic import *
 
@@ -43,7 +43,7 @@ class ColumnDef(Rule[ast.ColumnDef]):
         t = ts.gettok().and_then(cast(Identifier))
         if not t:
             ts.ungettok()
-            return Err(Expected(['column name'], t.err().got))
+            return Err(t.err().set_expected(['column name']))
         name = t.ok()
 
         t = Ty.parse(ts)

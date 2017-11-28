@@ -1,6 +1,7 @@
 from typing import *
 
-from ..expected import Expected
+from dropSQL.generic import *
+from dropSQL.parser.expected import *
 from .token import Token
 from .identifier import IdentifierBase, Identifier, Reserved
 from . import reserved as __reserved
@@ -10,8 +11,6 @@ from .literal import Literal, Integer, Float, String
 from .placehodler import Placeholder
 from .comma import Comma
 from .paren import LParen, RParen
-
-from dropSQL.generic import Result, Ok, Err, IterOk
 
 __all__ = (
     'Token',
@@ -60,7 +59,7 @@ __all__ = (
     'RParen',
 )
 
-EOF = ''
+EMPTY = ''
 
 
 class Stream:
@@ -74,17 +73,17 @@ class Stream:
         self.cursor: int = 0
         self.done = False  # once getch on exhausted stream, this flag will always be True.
 
-    def getch(self) -> Result[str, None]:
+    def getch(self) -> Result[str, EOF]:
         """ return next character in a stream or Error. """
         if self.cursor >= len(self.data):
-            char = Err(None)
+            char = Err(EOF(['char']))
             self.done = True
 
         else:
             char = Ok(self.data[self.cursor])
             self.cursor += 1
 
-        assert ((char.is_err() and self.done) or
+        assert ((char.is_err() and char.err().eof() and self.done) or
                 (len(char.ok()) == 1 and not self.done))
         return char
 
@@ -134,20 +133,16 @@ keywords.update({
 def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Expected]:
     """
     Extract next token from character stream.
-
-    Error could be one of two types:
-    - got == 'EOF'
-    - and all the others.
     """
     if skip_space:
         skip_whitespaces(stream)
 
-    char = stream.getch().ok_or(EOF)
-    next_char = stream.getch().ok_or(EOF)
+    char = stream.getch().ok_or(EMPTY)
+    next_char = stream.getch().ok_or(EMPTY)
     stream.ungetch()
 
-    if char == EOF:
-        return Err(Expected(['token'], 'EOF'))
+    if char == EMPTY:
+        return Err(EOF(['token']))
 
     elif char == ',':
         return Ok(Comma())
@@ -163,11 +158,11 @@ def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Expecte
 
     elif char.isdigit() or char == '.':
         num = char
-        char = stream.getch().ok_or(EOF)
+        char = stream.getch().ok_or(EMPTY)
 
         while char.isdigit() or char == '.':
             num += char
-            char = stream.getch().ok_or(EOF)
+            char = stream.getch().ok_or(EMPTY)
 
         stream.ungetch()
         if '.' in num:
@@ -186,8 +181,8 @@ def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Expecte
     elif char == '-':
         if next_char == '-':
             # comment, skip until EOL of EOF
-            while char != EOF and char != '\n' and char != '\r':
-                char = stream.getch().ok_or(EOF)
+            while char != EMPTY and char != '\n' and char != '\r':
+                char = stream.getch().ok_or(EMPTY)
 
             return next_token(stream)
 
@@ -207,16 +202,11 @@ def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Expecte
         return Ok(Operator(char))
 
     elif char == '?':
-        index = next_token(stream, False)
-        if index.is_err():
-            return Err(index.err())
+        t = next_token(stream, False).and_then(cast(Integer))
+        if not t: return Err(t.err())
 
-        else:
-            integer = index.ok()
-            if not isinstance(integer, Integer):
-                return Err(Expected(['integer'], str(integer)))
-            else:
-                return Ok(Placeholder(integer.value))
+        index = t.ok()
+        return Ok(Placeholder(index.value))
 
     else:
         stream.ungetch()
@@ -226,12 +216,12 @@ def next_token(stream: Stream, skip_space: bool = True) -> Result[Token, Expecte
 def tok_identifier(stream: Stream, char: str) -> Token:
     slash = char == '/'
     if slash:
-        char = stream.getch().ok_or(EOF)
+        char = stream.getch().ok_or(EMPTY)
 
     ident = ''
     while char.isalnum() or char == '_':
         ident += char
-        char = stream.getch().ok_or(EOF)
+        char = stream.getch().ok_or(EMPTY)
     stream.ungetch()
 
     keyword = keywords.get(ident.lower(), None)
@@ -242,20 +232,20 @@ def tok_identifier(stream: Stream, char: str) -> Token:
         return Identifier(ident, slash)
 
 
-def tok_string(stream: Stream) -> Result[String, Expected]:
+def tok_string(stream: Stream) -> Result[String, EOF]:
     string = ''
-    char = stream.getch().ok_or(EOF)
-    while char != EOF and char != '\'':
+    char = stream.getch().ok_or(EMPTY)
+    while char != EMPTY and char != '\'':
         if char == '\\':
             # escape sequence
-            char = stream.getch().ok_or(EOF)
+            char = stream.getch().ok_or(EMPTY)
         string += char
-        char = stream.getch().ok_or(EOF)
+        char = stream.getch().ok_or(EMPTY)
 
     # no ungetch because we want to consume the closing quote
 
-    if char == EOF:
-        return Err(Expected(['string literal'], 'EOF'))
+    if char == EMPTY:
+        return Err(EOF(['string literal']))
     else:
         return Ok(String(string))
 
