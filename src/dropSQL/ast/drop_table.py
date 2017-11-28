@@ -1,9 +1,11 @@
 from typing import *
 
-from . import *
+from .ast import AstStmt
+from .existence import IfExists
+from .identifier import Identifier
 
 
-class DropTable(Ast, AstStmt):
+class DropTable(AstStmt):
     def __init__(self, if_exists: Optional[IfExists], table: Identifier) -> None:
         super().__init__()
 

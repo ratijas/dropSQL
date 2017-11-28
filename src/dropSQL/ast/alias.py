@@ -1,7 +1,9 @@
 import abc
 from typing import *
 
-from . import *
+from .ast import Ast
+from .expression import Expression
+from .identifier import Identifier
 
 
 class Alias(Ast, metaclass=abc.ABCMeta):
@@ -36,6 +38,6 @@ class AliasedExpression(Alias):
         self.expression = expression
 
     def to_sql(self) -> str:
-        expr = self.expression.to_sql()
+        expr: str = self.expression.to_sql()
         expr += super().to_sql()
         return expr

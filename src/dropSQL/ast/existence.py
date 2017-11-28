@@ -1,4 +1,4 @@
-from . import *
+from .ast import Ast
 
 __all__ = (
     'IfExists',

@@ -1,9 +1,11 @@
 from typing import *
 
-from . import *
+from .ast import AstStmt
+from .expression import Expression
+from .identifier import Identifier
 
 
-class DeleteFrom(Ast, AstStmt):
+class DeleteFrom(AstStmt):
     def __init__(self, table: Identifier, where: Optional[Expression]) -> None:
         super().__init__()
 

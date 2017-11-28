@@ -1,9 +1,11 @@
 from typing import *
 
-from . import *
+from .ast import AstStmt
+from .expression import Expression
+from .identifier import Identifier
 
 
-class UpdateSet(Ast, AstStmt):
+class UpdateSet(AstStmt):
     def __init__(self,
                  table: Identifier,
                  assign: List[Tuple[Identifier, Expression]],

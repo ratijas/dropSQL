@@ -1,9 +1,11 @@
 from typing import *
 
-from . import *
+from .ast import AstStmt
+from .expression import Expression
+from .identifier import Identifier
 
 
-class InsertInto(Ast, AstStmt):
+class InsertInto(AstStmt):
     def __init__(self, table: Identifier, columns: List[Identifier], values: List[List[Expression]]) -> None:
         super().__init__()
 

@@ -1,13 +1,13 @@
 import abc
 
-from . import *
+from .ast import Ast
 
-__all__ = (
+__all__ = [
     'Ty',
     'IntegerTy',
     'FloatTy',
     'VarCharTy',
-)
+]
 
 
 class Ty(Ast, metaclass=abc.ABCMeta): pass

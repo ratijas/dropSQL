@@ -1,20 +1,21 @@
 import abc
 from typing import *
 
-from parser.tokens import Operator
-from . import *
+from .identifier import Identifier
+from dropSQL.parser.tokens import Operator
+from .ast import Ast
 
-__all__ = (
+__all__ = [
     'Expression',
     'ExpressionLiteral',
     'ExpressionLiteralInt',
     'ExpressionLiteralFloat',
-    'ExpressionLiteralString',
+    'ExpressionLiteralVarChar',
     'ExpressionPlaceholder',
     'ExpressionReference',
     'ExpressionParen',
     'ExpressionBinary',
-)
+]
 
 
 class Expression(Ast, metaclass=abc.ABCMeta): pass
@@ -27,7 +28,7 @@ class ExpressionLiteral(Expression, Generic[T]):
     def __init__(self, lit: T) -> None:
         super().__init__()
 
-        self.value = lit
+        self.value: T = lit
 
 
 class ExpressionLiteralInt(ExpressionLiteral[int]):
@@ -46,7 +47,7 @@ class ExpressionLiteralFloat(ExpressionLiteral[float]):
         return '%f' % self.value
 
 
-class ExpressionLiteralString(ExpressionLiteral[str]):
+class ExpressionLiteralVarChar(ExpressionLiteral[str]):
     def __init__(self, lit: str) -> None:
         super().__init__(lit)
 

@@ -1,9 +1,13 @@
 from typing import *
 
-from . import *
+from .alias import AliasedTable
+from .ast import AstStmt
+from .expression import Expression
+from .join import JoinAst
+from .result_column import ResultColumn
 
 
-class SelectFrom(Ast, AstStmt):
+class SelectFrom(AstStmt):
     """
     "/select" /result_columns
       "from" /from_body
@@ -13,7 +17,7 @@ class SelectFrom(Ast, AstStmt):
     def __init__(self,
                  columns: List[ResultColumn],
                  table: AliasedTable,
-                 joins: List[JoinAst] = (),
+                 joins: List[JoinAst] = list(),
                  where: Optional[Expression] = None) -> None:
         super().__init__()
 

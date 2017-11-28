@@ -1,7 +1,9 @@
 import abc
 from typing import *
 
-from . import *
+from .alias import AliasedTable
+from .ast import Ast
+from .expression import Expression
 
 __all__ = (
     'JoinAst',

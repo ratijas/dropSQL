@@ -1,6 +1,7 @@
 import abc
 
-from . import *
+from .alias import AliasedExpression
+from .ast import Ast
 
 
 class ResultColumn(Ast, metaclass=abc.ABCMeta):

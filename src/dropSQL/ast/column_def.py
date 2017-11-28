@@ -1,4 +1,6 @@
-from . import *
+from .ast import Ast
+from .identifier import Identifier
+from .ty import Ty
 
 
 class ColumnDef(Ast):

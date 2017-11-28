@@ -8,8 +8,8 @@ class AstTestCase(TestCase):
     def test_expression(self):
         self.assertEqual('42', ExpressionLiteralInt(42).to_sql())
         self.assertEqual('42.000000', ExpressionLiteralFloat(42.0).to_sql())
-        self.assertEqual("'world'", ExpressionLiteralString('world').to_sql())
-        self.assertEqual(r"'ab\\cd\'s'", ExpressionLiteralString(r"ab\cd's").to_sql())
+        self.assertEqual("'world'", ExpressionLiteralVarChar('world').to_sql())
+        self.assertEqual(r"'ab\\cd\'s'", ExpressionLiteralVarChar(r"ab\cd's").to_sql())
         self.assertEqual('?42', ExpressionPlaceholder(42).to_sql())
         self.assertEqual('name', ExpressionReference(None, Identifier('name')).to_sql())
         self.assertEqual('person name', ExpressionReference(Identifier('person'), Identifier('name')).to_sql())
@@ -90,9 +90,9 @@ class AstTestCase(TestCase):
                 Identifier('height', False),
             ],
             [
-                [ExpressionLiteralString('morty'), ExpressionLiteralInt(11), ExpressionPlaceholder(1)],
-                [ExpressionLiteralString('jimmy'), ExpressionLiteralInt(10), ExpressionPlaceholder(2)],
-                [ExpressionLiteralString('jerry'),
+                [ExpressionLiteralVarChar('morty'), ExpressionLiteralInt(11), ExpressionPlaceholder(1)],
+                [ExpressionLiteralVarChar('jimmy'), ExpressionLiteralInt(10), ExpressionPlaceholder(2)],
+                [ExpressionLiteralVarChar('jerry'),
                  ExpressionBinary(
                      Operator('+'),
                      ExpressionLiteralInt(14),
@@ -117,7 +117,7 @@ class AstTestCase(TestCase):
                              ExpressionBinary(
                                  Operator('='),
                                  ExpressionReference(None, Identifier('name')),
-                                 ExpressionLiteralString('morty')))
+                                 ExpressionLiteralVarChar('morty')))
                          .to_sql())
 
     def test_update_set(self):

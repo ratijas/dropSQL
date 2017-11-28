@@ -11,7 +11,7 @@ class Ast(metaclass=abc.ABCMeta):
         """
 
 
-class AstStmt(metaclass=abc.ABCMeta):
+class AstStmt(Ast, metaclass=abc.ABCMeta):
     """
     Statement mix-in for Ast subclasses
     """

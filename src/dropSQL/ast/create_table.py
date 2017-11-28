@@ -1,9 +1,12 @@
 from typing import *
 
-from . import *
+from .ast import AstStmt
+from .column_def import ColumnDef
+from .existence import IfNotExists
+from .identifier import Identifier
 
 
-class CreateTable(Ast, AstStmt):
+class CreateTable(AstStmt):
     def __init__(self, if_not_exists: Optional[IfNotExists], table: Identifier, columns: List[ColumnDef]) -> None:
         super().__init__()
 
