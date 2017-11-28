@@ -3,15 +3,13 @@ from typing import *
 from dropSQL.parser.expected import *
 from .result import *
 
-__all__ = (
-    'cast',
-    'drop',
-)
+__all__ = ['Cast']
 
 T = TypeVar('T')
 
 
-def cast(ty: Type[T]) -> Callable[[Any], Result[T, Expected]]:
+# noinspection PyPep8Naming
+def Cast(ty: Type[T]) -> Callable[[Any], Result[T, Expected]]:
     """
     Abstraction over builtin `isinstance` using `Result`.
     """
@@ -23,6 +21,3 @@ def cast(ty: Type[T]) -> Callable[[Any], Result[T, Expected]]:
             return Err(Expected([str(ty)], str(o)))
 
     return inner
-
-
-def drop(_x: Any) -> None: pass

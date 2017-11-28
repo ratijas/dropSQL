@@ -11,23 +11,23 @@ class GenericTestCase(TestCase):
         self.assertTrue(res.is_ok())
         self.assertEqual(res.ok(), 42)
 
-        res = Err(EOF(['token']))
+        res = Err(Incomplete(['token']))
         self.assertTrue(res.is_err())
         self.assertFalse(res.is_ok())
-        self.assertTrue(res.err().eof())
+        self.assertTrue(res.err().incomplete())
 
     def test_result_fn(self):
-        res: Result[int, None] = Ok(42)
+        res = Ok(42)  # type: Result[int, None]
         self.assertTrue(res.is_ok())
-        res: Result[int, None] = res.map(lambda x: x + 2)
+        res = res.map(lambda x: x + 2)  # type: Result[int, None]
         self.assertTrue(res.is_ok())
         self.assertEqual(res.ok(), 44)
 
-        res: Result[str, int] = res.and_then(lambda x: Ok('') if None else Err(int(x / 4)))
+        res = res.and_then(lambda x: Ok('') if None else Err(int(x / 4)))  # type: Result[str, int]
         self.assertFalse(res.is_ok())
         self.assertEqual(res.err(), 11)
 
-        res: Result[str, float] = res.map_err(float)
+        res = res.map_err(float)  # type: Result[str, float]
         self.assertTrue(res.is_err())
         self.assertIsInstance(res.err(), float)
 
@@ -36,23 +36,22 @@ class GenericTestCase(TestCase):
 
     def test_cast(self):
         i = 5
-        res = cast(float)(i)
+        res = Cast(float)(i)
         self.assertTrue(res.is_err())
         self.assertFalse(res)
 
-        s = TokenStream(Stream('/drop'))
-        tok = s.gettok().ok()  # type: Token
-        self.assertTrue(cast(Reserved)(tok))
-        self.assertTrue(cast(Drop)(tok))
-        self.assertFalse(cast(Operator)(tok))
+        tok: Token = Drop()
+        self.assertTrue(Cast(Keyword)(tok))
+        self.assertTrue(Cast(Drop)(tok))
+        self.assertFalse(Cast(Operator)(tok))
 
     def test_caster(self):
-        cs = cast(int)
+        cs = Cast(int)
         ok = cs(42)
         err = cs(0.3)
 
         self.assertTrue(ok)
         self.assertFalse(err)
 
-        err = cast(LParen)(Create())
+        err = Cast(LParen)(Create())
         self.assertFalse(err)
