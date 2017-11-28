@@ -5,13 +5,13 @@ from .stream import Stream
 
 
 class Statements(Stream[ast.AstStmt]):
-    def __init__(self, tokens: Stream[Token]):
+    def __init__(self, tokens: Stream[Token]) -> None:
         super().__init__()
 
         self.tokens = tokens
 
     def next_impl(self) -> IResult[ast.AstStmt]:
-        return Err(Empty())
+        return IErr(Empty())
 
         # tok = self.tokens.next()
         # if tok.is_err(): return Err(tok.err())

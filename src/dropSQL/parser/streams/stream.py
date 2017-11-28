@@ -7,11 +7,11 @@ from dropSQL.generic import *
 class Stream(Generic[T], metaclass=abc.ABCMeta):
     """
     Conceptually, endless stream of `Result`s.
-    In practice, this means that after some `Ok` results
-    it will start producing `Incomplete` results, or ever `Err`.
+    In practice, this means that after some `IOk` results
+    it will start producing (normally the same over and over again) `IErr` results.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.cursor = 0
         self.buffer = []  # type: List[T]
         self.err = None  # type: Optional[Error]
@@ -34,9 +34,9 @@ class Stream(Generic[T], metaclass=abc.ABCMeta):
             err = self.current().err()
 
             if err.is_empty():
-                return Ok(xs)
+                return IOk(xs)
             else:  # err.is_syntax() or err.is_incomplete():
-                return Err(err)
+                return IErr(err)
 
     def current(self) -> IResult[T]:
         return self._current
@@ -49,9 +49,10 @@ class Stream(Generic[T], metaclass=abc.ABCMeta):
         """
         assert 0 <= self.cursor <= len(self.buffer)
 
+        res: IResult[T]
         if self.cursor == len(self.buffer):
             if self.err is not None:
-                res = Err(self.err)
+                res = IErr(self.err)
 
             else:
                 res = self.next_impl()
@@ -66,7 +67,7 @@ class Stream(Generic[T], metaclass=abc.ABCMeta):
         else:  # self.cursor < len(self.buffer)
             item = self.buffer[self.cursor]
             self.cursor += 1
-            res = Ok(item)
+            res = IOk(item)
 
         self._current = res
         return res
@@ -81,10 +82,9 @@ class Stream(Generic[T], metaclass=abc.ABCMeta):
 
         self.cursor -= n
         if self.cursor > 0:
-            current = Ok(self.buffer[self.cursor - 1])
+            self._current = IOk(self.buffer[self.cursor - 1])
         else:
-            current = Err(Empty())
-        self._current = current
+            self._current = IErr(Empty())
 
     @abc.abstractmethod
     def next_impl(self) -> IResult[T]:
