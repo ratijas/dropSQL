@@ -1,21 +1,12 @@
-"""
-Table descriptor structure:
-    strz table name
-    [
-        strz column_name
-        u2 column_type
-        0 - int
-        1..65534 - string length
-        65536 - float
-    ]
-    13 32-bit pointers pointers
-"""
-import math
+from typing import *
 
+from dropSQL.ast import *
 from dropSQL.fs.db_file import DBFile
 from dropSQL.fs.block import Block
 import sys
 import struct
+
+from dropSQL.parser.tokens.literal import Literal, String
 
 
 class Table:
@@ -42,7 +33,7 @@ class Table:
             "records": int.from_bytes(block.data[4092:], byteorder='big')
         }
 
-        columns = []
+        columns: List[ColumnDef] = []
         column_descriptors = block.data[block.data.find(b'\0') + 1: 4040]
         # meow
         i = 0
@@ -54,23 +45,13 @@ class Table:
                 nyaa = column_descriptors[i:meow].decode("UTF-8")
                 mjau = int.from_bytes(column_descriptors[meow + 1:meow + 3], byteorder='big')
                 if mjau == 0:
-                    purr = "int"
+                    purr = IntegerTy()
                 else:
                     if mjau == 65535:
-                        purr = "float"
+                        purr = FloatTy()
                     else:
-                        purr = "string"
-                if purr == "string":
-                    columns.append({
-                        "name": nyaa,
-                        "type": purr,
-                        "length": mjau
-                    })
-                else:
-                    columns.append({
-                        "name": nyaa,
-                        "type": purr
-                    })
+                        purr = VarCharTy(mjau)
+                columns.append(ColumnDef(Identifier(nyaa), purr, False))
                 i = meow + 3
 
         table_descriptor["columns"] = columns
@@ -80,14 +61,16 @@ class Table:
         sys.stderr.write('Encoding: ' + str(descriptor) + '\n')
         data = descriptor["table_name"].encode("UTF-8") + b'\0'
         for col in descriptor["columns"]:
-            data += col["name"].encode("UTF-8") + b'\0'
-            if col["type"] == "int":
+            col: ColumnDef = col
+            data += col.name.identifier.encode("UTF-8") + b'\0'
+            if isinstance(col.ty, IntegerTy):
                 data += b'\0\0'
+            elif isinstance(col.ty, FloatTy):
+                data += b'\xff\xff'
+            elif isinstance(col.ty, VarCharTy):
+                data += col.ty.width.to_bytes(2, byteorder='big')
             else:
-                if col["type"] == "float":
-                    data += b'\xff\xff'
-                else:
-                    data += col["length"].to_bytes(2, byteorder='big')
+                raise NotImplementedError
         while len(data) < 4040:
             data += b'\0'
         for p in descriptor["pointers"]:
@@ -104,25 +87,15 @@ class Table:
         descriptor["table_name"] = new_name
         self._encode_descriptor(descriptor)
 
-    def get_columns(self) -> list:
+    def get_columns(self) -> List[ColumnDef]:
         return self._decode_descriptor()["columns"]
 
     def count_records(self):
         return self._decode_descriptor()["records"]
 
-    def add_int_column(self, name):
+    def add_column(self, column: ColumnDef):
         descriptor = self._decode_descriptor()
-        descriptor["columns"].append({"name": name, "type": "int"})
-        self._encode_descriptor(descriptor)
-
-    def add_float_column(self, name):
-        descriptor = self._decode_descriptor()
-        descriptor["columns"].append({"name": name, "type": "float"})
-        self._encode_descriptor(descriptor)
-
-    def add_string_column(self, name, size):
-        descriptor = self._decode_descriptor()
-        descriptor["columns"].append({"name": name, "type": "string", "length": size})
+        descriptor["columns"].append(column)
         self._encode_descriptor(descriptor)
 
     def _add_block(self):
@@ -214,7 +187,7 @@ class Table:
         if len(data) > 4096:
             self.connection.write_block(self._get_data_pointer(base_page_num + 1), Block(data[4096:]))
 
-    def insert(self, values: dict):
+    def insert(self, values: Dict[Identifier, Literal]):
         self._validate_insert_values(values)
         record_num = self.count_records()
         data_block = self._get_data_with_record(record_num)
@@ -234,53 +207,60 @@ class Table:
         fixed = dict()
         for i in range(0, len(self.get_columns())):
             if type(decoded[i]) == bytes:
-                fixed[self.get_columns()[i]["name"]] = decoded[i].split(b'\0')[0].decode("UTF-8")
+                fixed[self.get_columns()[i].name] = decoded[i].split(b'\0')[0].decode("UTF-8")
             else:
-                fixed[self.get_columns()[i]["name"]] = decoded[i]
+                fixed[self.get_columns()[i].name] = decoded[i]
         return fixed
 
-    def _validate_insert_values(self, values):
-        # all fields are present:
-        values.keys() == {a["name"] for a in self.get_columns()}
+    def _validate_insert_values(self, values: Dict[Identifier, Literal]):
+        """
+        ensure all columns of this table are present
+        """
+        assert values.keys() == {column.name for column in self.get_columns()}
 
     def _calculate_record_size(self) -> int:
         s = 0
         for column in self.get_columns():
-            if column["type"] == "int":
+            if isinstance(column.ty, IntegerTy):
                 s += 4
-            elif column["type"] == "float":
+            elif isinstance(column.ty, FloatTy):
                 s += 4
-            elif column["type"] == "string":
-                s += column["length"]
+            elif isinstance(column.ty, VarCharTy):
+                s += column.ty.width
+            else:
+                raise NotImplementedError
 
         return s
 
     def _make_struct_format_string(self):
         res = ''
-        for c in self.get_columns():
-            if c["type"] == 'int':
+        for column in self.get_columns():
+            if isinstance(column.ty, IntegerTy):
                 res += 'i'
-            elif c["type"] == 'float':
+            elif isinstance(column.ty, FloatTy):
                 res += 'f'
-            else:
-                res += str(c["length"]) + 's'
+            elif isinstance(column.ty, VarCharTy):
+                res += str(column.ty.width) + 's'
         return res
 
     def _decode_record(self, data_block, page_offset):
         return struct.unpack(self._make_struct_format_string(),
                              data_block[page_offset: page_offset + self._calculate_record_size()])
 
-    def _get_type_by_column_name(self, name: str):
-        for d in self.get_columns():
-            if d["name"] == name:
-                return d["type"]
+    def get_column_by_name(self, name: Identifier) -> ColumnDef:
+        for column in self.get_columns():
+            if column.name == name:
+                return column
 
-    def _encode_record(self, values: dict):
-        t = ()
+    def _encode_record(self, values: Dict[Identifier, Literal]):
+        """
+        assume that value types correspond to column types.
+        """
+        t = []
         for k, v in values.items():
-            if self._get_type_by_column_name(k) == "string":
-                t += (v.encode("UTF-8"),)
+            if isinstance(v, String):
+                t.append(v.value.encode("UTF-8"))
             else:
-                t += (v,)
+                t.append(v.value)
 
         return struct.pack(self._make_struct_format_string(), *t)

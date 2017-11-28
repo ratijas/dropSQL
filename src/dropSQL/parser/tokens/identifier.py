@@ -32,6 +32,9 @@ class IdentifierBase(Token, metaclass=abc.ABCMeta):
     def __eq__(self, o: 'IdentifierBase') -> bool:
         return isinstance(o, self.__class__) and self.identifier.lower() == o.identifier.lower()
 
+    def __hash__(self) -> int:
+        return self.identifier.lower().__hash__()
+
 
 class Identifier(IdentifierBase):
     def __repr__(self) -> str:

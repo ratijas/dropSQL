@@ -2,7 +2,7 @@ from . import *
 
 
 class ColumnDef(Ast):
-    def __init__(self, name: Identifier, ty: Ty, is_primary_key: bool) -> None:
+    def __init__(self, name: Identifier, ty: Ty, is_primary_key: bool = False) -> None:
         super().__init__()
 
         self.name = name

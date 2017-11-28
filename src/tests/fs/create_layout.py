@@ -1,8 +1,13 @@
 from unittest import TestCase
 
+from dropSQL.ast import ColumnDef, IntegerTy, FloatTy, VarCharTy
 from dropSQL.fs.db_file import DBFile
 import os
 import sys
+
+from dropSQL.fs.table import Table
+from dropSQL.parser.tokens.identifier import Identifier
+from dropSQL.parser.tokens.literal import Integer, Float, String
 
 
 class LayoutCase(TestCase):
@@ -18,24 +23,24 @@ class LayoutCase(TestCase):
         assert metadata.get_data_blocks_count() == 0, "Initial data blocks count is not zero"
 
         tables = connection.get_tables()
-        for i in range(0, 16):
+        for i, table in enumerate(tables):
             table_name = "Table {}!".format(i)
-            tables[i].set_table_name(table_name)
-            assert tables[i].get_table_name() == table_name, "Failed to read table name"
-            tables[i].add_int_column("int column 1")
-            tables[i].add_int_column("int column 2")
-            tables[i].add_float_column("float column 1")
-            tables[i].add_float_column("float column 2")
-            tables[i].add_string_column("string column 1", 123)
-            tables[i].add_string_column("string column 2", 321)
-            tables[i].insert({"int column 1": 1,
-                              "int column 2": 2,
-                              "float column 1": 2.71,
-                              "float column 2": 3.14,
-                              "string column 1": "meow",
-                              "string column 2": "purr"})
-            sys.stderr.write(str(tables[i].select(0)))
-            # sys.stderr.write('Record count: ' + str(tables[i].count_records()))
-            sys.stderr.write(str(tables[i].get_columns()) + "\n")
+            table.set_table_name(table_name)
+            assert table.get_table_name() == table_name, "Failed to read table name"
+            table.add_column(ColumnDef(Identifier("int 1"), IntegerTy()))
+            table.add_column(ColumnDef(Identifier("int 2"), IntegerTy()))
+            table.add_column(ColumnDef(Identifier("float 1"), FloatTy()))
+            table.add_column(ColumnDef(Identifier("float 2"), FloatTy()))
+            table.add_column(ColumnDef(Identifier("string 1"), VarCharTy(123)))
+            table.add_column(ColumnDef(Identifier("string 2"), VarCharTy(321)))
+            table.insert({Identifier("int 1"): Integer(1),
+                          Identifier("int 2"): Integer(2),
+                          Identifier("float 1"): Float(2.71),
+                          Identifier("float 2"): Float(3.14),
+                          Identifier("string 1"): String("meow"),
+                          Identifier("string 2"): String("purr")})
+            sys.stderr.write(str(table.select(0)))
+            # sys.stderr.write('Record count: ' + str(table.count_records()))
+            sys.stderr.write(str(table.get_columns()) + "\n")
 
         connection.close()

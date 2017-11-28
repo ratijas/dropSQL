@@ -1,7 +1,7 @@
 import abc
 from typing import *
 
-from parser.tokens import Operator
+from dropSQL.parser.tokens import Operator
 from . import *
 
 __all__ = (

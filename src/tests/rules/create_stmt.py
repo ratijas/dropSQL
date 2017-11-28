@@ -17,7 +17,7 @@ class CreateStmtTestCase(TestCase):
         table = res.ok()
 
         self.assertFalse(table.if_not_exists)
-        self.assertEqual(table.name, Identifier('person'))
+        self.assertEqual(table.table, Identifier('person'))
         self.assertEqual(1, len(table.columns))
 
     def test_no_columns(self):
