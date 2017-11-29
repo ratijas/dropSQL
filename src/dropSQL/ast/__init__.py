@@ -1,3 +1,4 @@
+from . import stmt
 from .alias import Alias, AliasedTable, AliasedExpression
 from .ast import Ast, AstStmt
 from .column_def import ColumnDef
