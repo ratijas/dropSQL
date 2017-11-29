@@ -1,17 +1,17 @@
 import sys
 from unittest import TestCase
 
-from dropSQL.ast import ColumnDef, IntegerTy, FloatTy, VarCharTy
+from dropSQL.ast import ColumnDef, IntegerTy, VarCharTy
 from dropSQL.fs.db_file import DBFile
 from dropSQL.fs.table import Table
 from dropSQL.parser.tokens.identifier import Identifier
-from dropSQL.parser.tokens.literal import Integer, Float, VarChar
+from dropSQL.parser.tokens.literal import Integer, VarChar
 
 
 class LayoutCase(TestCase):
     def test(self):
-        open("test.dropdb", "w").close()
-        connection = DBFile("test.dropdb")
+        # open(":memory:", "w").close()
+        connection = DBFile(":memory:")
 
         db_name = "Database name!"
         metadata = connection.get_metadata()
@@ -25,19 +25,19 @@ class LayoutCase(TestCase):
         for index, table in enumerate(tables):
             table: Table = table
 
-            table_name = "Table {}!".format(index)
+            table_name = Identifier("Table {}!".format(index))
             table.set_table_name(table_name)
             assert table.get_table_name() == table_name, "Failed to read table name"
             table.add_column(ColumnDef(Identifier("ind"), IntegerTy()))
             table.add_column(ColumnDef(Identifier("text"), VarCharTy(15)))
-            for i in range(0, 10 ** 3):
+            for i in range(0, 10 ** 4):
                 # sys.stderr.write("Inserting record {} into {}\n".format(i, index))
-                table.insert({Identifier("ind"): Integer(i),
+                table.insert({Identifier("ind") : Integer(i),
                               Identifier("text"): VarChar("qwerty123456")})
                 if i % 3 == 0:
                     table.delete(i)
                 if i % 3 == 1:
-                    table.update(i, {Identifier("ind"): Integer(-i),
+                    table.update(i, {Identifier("ind") : Integer(-i),
                                      Identifier("text"): VarChar("123456qwerty")})
                 try:
                     values = table.select(i)

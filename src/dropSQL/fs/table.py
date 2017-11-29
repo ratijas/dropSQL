@@ -85,12 +85,12 @@ class Table:
 
         self._write_block(Block(data))
 
-    def get_table_name(self) -> str:
-        return self._decode_descriptor()["table_name"]
+    def get_table_name(self) -> Identifier:
+        return Identifier(self._decode_descriptor()["table_name"], True)
 
-    def set_table_name(self, new_name: str) -> None:
+    def set_table_name(self, new_name: Identifier) -> None:
         descriptor = self._decode_descriptor()
-        descriptor["table_name"] = new_name
+        descriptor["table_name"] = new_name.identifier.lower()
         self._encode_descriptor(descriptor)
 
     def get_columns(self) -> List[ColumnDef]:
