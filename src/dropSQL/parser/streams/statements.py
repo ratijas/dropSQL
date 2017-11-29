@@ -2,6 +2,7 @@ from dropSQL.ast import *
 from dropSQL.generic import *
 from dropSQL.parser.tokens import *
 from .stream import Stream
+from .tokens import Tokens
 
 
 class Statements(Stream[ast.AstStmt]):
@@ -9,6 +10,10 @@ class Statements(Stream[ast.AstStmt]):
         super().__init__()
 
         self.tokens = tokens
+
+    @classmethod
+    def from_str(cls, source: str) -> 'Statements':
+        return Statements(Tokens.from_str(source))
 
     def next_impl(self) -> IResult[ast.AstStmt]:
         return IErr(Empty())

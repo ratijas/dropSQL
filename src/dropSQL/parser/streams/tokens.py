@@ -1,6 +1,6 @@
 from dropSQL.generic import *
 from dropSQL.parser.tokens import *
-
+from .characters import Characters
 from .stream import Stream
 
 
@@ -9,6 +9,10 @@ class Tokens(Stream[Token]):
         super().__init__()
 
         self.characters = characters
+
+    @classmethod
+    def from_str(cls, source: str) -> 'Tokens':
+        return Tokens(Characters.from_str(source))
 
     def next_impl(self, skip_whitespace: bool = True) -> IResult[Token]:
         """
