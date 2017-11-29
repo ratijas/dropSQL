@@ -1,9 +1,10 @@
 import sys
-from io import StringIO
+# noinspection PyUnresolvedReferences
+import readline
 
-from . import __version__
-from .connection import Connection
-from .parser.streams import *
+from dropSQL import __version__
+from dropSQL.connection import Connection
+from dropSQL.parser.streams.statements import Statements
 
 
 def open_file_or_memory() -> Connection:
@@ -39,27 +40,35 @@ class Repl:
             try:
                 line = input(self.PS)
             except KeyboardInterrupt as _:
+                print()
+                self.reset()
+                continue
+            except EOFError as _:
+                print()
+                self.reset()
                 break
 
             self.buffer += line
             self.buffer += '\n'
-            stmts = Statements(Tokens(Characters(StringIO(self.buffer)))).collect()
+            stmts = Statements.from_str(self.buffer).collect()
 
             if stmts.is_ok():
                 for stmt in stmts.ok():
                     print(f'parsed rule:', stmt.to_sql())
                     self.connection.execute(stmt)
 
-                self.buffer = ''
-                self.PS = self.PS1
+                self.reset()
 
             elif stmts.err().is_incomplete():
                 self.PS = self.PS2
 
             elif stmts.err().is_syntax():
                 print('syntax error:', stmts.err())
-                self.buffer = ''
-                self.PS = self.PS1
+                self.reset()
+
+    def reset(self):
+        self.buffer = ''
+        self.PS = self.PS1
 
 
 def launch():
