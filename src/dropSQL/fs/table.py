@@ -239,12 +239,12 @@ class Table:
                 .format(record_num, self.count_records())
         data_block = self._get_data_block_with_record(record_num)
         decoded = self._decode_record(data_block, (record_num * self._calculate_record_size()) % 4096)
-        fixed = dict()
+        fixed = list()
         for i in range(0, len(self.get_columns())):
             if type(decoded[i]) == bytes:
-                fixed[self.get_columns()[i].name] = decoded[i].split(b'\0')[0].decode("UTF-8")
+                fixed.append(decoded[i].split(b'\0')[0].decode("UTF-8"))
             else:
-                fixed[self.get_columns()[i].name] = decoded[i]
+                fixed.append(decoded[i])
         return fixed
 
     def select_all(self):
