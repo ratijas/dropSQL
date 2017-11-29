@@ -2,7 +2,6 @@ from .token import Token
 
 
 class Operator(Token):
-
     EQ = '='
     NE = '/='
     ADD = '+'
@@ -13,6 +12,9 @@ class Operator(Token):
     LT = '<'
     GE = '>='
     LE = '<='
+
+    AND = '/and'
+    OR = '/or'
 
     def __init__(self, operator: str) -> None:
         super().__init__()
