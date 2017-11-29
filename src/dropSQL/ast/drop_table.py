@@ -52,3 +52,19 @@ class DropTable(AstStmt):
         if not t: return IErr(t.err().empty_to_incomplete())
 
         return IOk(DropTable(if_exists, table))
+
+    def execute(self, db, args: List[Any] = ()) -> Result[bool, None]:
+        from dropSQL.fs import DBFile
+        db: DBFile = db
+
+        for table in db.get_tables():
+            name = table.get_table_name()
+
+            if name == self.table:
+                table.set_table_name(Identifier(''))
+                return Ok(True)
+
+        if self.if_exists is not None:  # error-tolerant
+            return Ok(False)
+        else:
+            return Err(None)

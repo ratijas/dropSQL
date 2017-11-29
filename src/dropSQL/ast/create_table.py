@@ -99,3 +99,22 @@ class CreateTable(AstStmt):
         if not t: return IErr(t.err().empty_to_incomplete())
 
         return IOk(columns)
+
+    def execute(self, db, args: List[Any] = ()) -> Result[bool, None]:
+        from dropSQL.fs import DBFile
+        db: DBFile = db
+
+        for table in db.get_tables():
+            name = table.get_table_name()
+
+            if name == self.table:
+                if self.if_not_exists is not None:  # error-tolerant
+                    return Ok(False)
+                else:
+                    return Err(None)
+            else:
+                if table.get_table_name().identifier == '':
+                    table.set_table_name(self.table)
+                    return Ok(True)
+
+        return Err(None)
