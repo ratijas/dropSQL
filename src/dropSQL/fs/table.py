@@ -1,15 +1,14 @@
 import struct
-import sys
 from typing import *
 
 from dropSQL.ast import *
-from dropSQL.fs.block import Block
-from dropSQL.fs.db_file import DBFile
 from dropSQL.parser.tokens.literal import Literal, VarChar
+from .block import Block
+from .block_storage import BlockStorage
 
 
 class Table:
-    def __init__(self, connection: DBFile, index: int):
+    def __init__(self, connection: BlockStorage, index: int):
         self.connection = connection
         self.index = index
         self.cached_descriptor = None
@@ -17,12 +16,13 @@ class Table:
     def _load_block(self) -> Block:
         return self.connection.read_block(1 + self.index)
 
-    def _write_block(self, block: Block):
+    def _write_block(self, block: Block) -> None:
         self.connection.write_block(1 + self.index, block)
 
     def _decode_descriptor(self) -> dict:
         if self.cached_descriptor:
             return self.cached_descriptor
+
         else:
             try:
                 block = self._load_block()
@@ -31,9 +31,9 @@ class Table:
 
             table_descriptor = {
                 "table_name": (block.data.split(b'\0')[0]).decode("UTF-8"),
-                "pointers": [int.from_bytes(block.data[4040 + i * 4:4040 + (i + 1) * 4], byteorder='big')
-                             for i in range(0, 13)],
-                "records": int.from_bytes(block.data[4092:], byteorder='big')
+                "pointers"  : [int.from_bytes(block.data[4040 + i * 4:4040 + (i + 1) * 4], byteorder='big')
+                               for i in range(0, 13)],
+                "records"   : int.from_bytes(block.data[4092:], byteorder='big')
             }
 
             columns: List[ColumnDef] = []
@@ -87,7 +87,7 @@ class Table:
     def get_table_name(self) -> str:
         return self._decode_descriptor()["table_name"]
 
-    def set_table_name(self, new_name: str):
+    def set_table_name(self, new_name: str) -> None:
         descriptor = self._decode_descriptor()
         descriptor["table_name"] = new_name
         self._encode_descriptor(descriptor)
@@ -95,7 +95,7 @@ class Table:
     def get_columns(self) -> List[ColumnDef]:
         return self._decode_descriptor()["columns"]
 
-    def count_records(self):
+    def count_records(self) -> int:
         return self._decode_descriptor()["records"]
 
     def add_column(self, column: ColumnDef):
@@ -104,7 +104,6 @@ class Table:
         self._encode_descriptor(descriptor)
 
     def _add_block(self):
-        # sys.stderr.write("Adding block!\n")
         self._add_zero_level_block() or self._add_first_level_block() or self._add_second_level_block() or self._add_third_level_block()
 
     def _add_pointer_to_block(self, pointer_to_block: int):
@@ -130,7 +129,7 @@ class Table:
                 return True
         return False
 
-    def _add_first_level_block(self):
+    def _add_first_level_block(self) -> bool:
         descriptor = self._decode_descriptor()
         if descriptor["pointers"][10] == 0:
             descriptor["pointers"][10] = self.connection.allocate_block()
@@ -138,15 +137,15 @@ class Table:
         block_pointer = descriptor["pointers"][10]  # first indirect pointer
         return self._add_pointer(block_pointer)
 
-    def _add_second_level_block(self):
+    def _add_second_level_block(self) -> bool:
         # TODO
         raise NotImplementedError
 
-    def _add_third_level_block(self):
+    def _add_third_level_block(self) -> bool:
         # TODO
         raise NotImplementedError
 
-    def _add_pointer(self, block_pointer):
+    def _add_pointer(self, block_pointer) -> bool:
         block = self.connection.read_block(block_pointer)
         for i in range(0, 1024):
             p = int.from_bytes(block.data[4 * i:4 * (i + 1)], byteorder='big')
@@ -220,7 +219,7 @@ class Table:
         if len(data) > 4096:
             self.connection.write_block(self._get_data_pointer(base_page_num + 1), Block(data[4096:]))
 
-    def insert(self, values: Dict[Identifier, Literal], record_num = -1):
+    def insert(self, values: Dict[Identifier, Literal], record_num=-1):
         self._validate_insert_values(values)
         if record_num == -1:
             record_num = self.count_records()
@@ -259,7 +258,7 @@ class Table:
         record_offset = record_num * self._calculate_record_size()
         data_block = self._get_data_block_with_record(record_num)
         data_block = data_block[0:record_offset % 4096] + b'd' + data_block[record_offset % 4096 + 1:]
-        self._set_data_with_record(record_offset//4096, data_block)
+        self._set_data_with_record(record_offset // 4096, data_block)
 
     def update(self, index: int, values: Dict[Identifier, Literal]):
         self.insert(values, index)
