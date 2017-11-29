@@ -27,6 +27,9 @@ class Statements(Stream[AstStmt]):
         if isinstance(tok, Drop):
             return DropTable.from_sql(self.tokens)
 
+        if isinstance(tok, Delete):
+            return DeleteFrom.from_sql(self.tokens)
+
         # elif isinstance(tok, Select): ...
 
         return Err(Syntax('/drop', str(tok)))
