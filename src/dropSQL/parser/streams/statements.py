@@ -21,10 +21,12 @@ class Statements(Stream[AstStmt]):
         if not t: return Err(t.err())
         tok = t.ok()
 
+        if isinstance(tok, Create):
+            return CreateTable.from_sql(self.tokens)
+
         if isinstance(tok, Drop):
             return DropTable.from_sql(self.tokens)
 
         # elif isinstance(tok, Select): ...
 
-        else:
-            return Err(Syntax('/drop', str(tok)))
+        return Err(Syntax('/drop', str(tok)))

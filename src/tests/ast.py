@@ -43,11 +43,11 @@ class AstTestCase(TestCase):
         self.assertEqual('varchar(42)', VarCharTy(42).to_sql())
 
     def test_column_def(self):
-        self.assertEqual('/name varchar(42) /primary key,',
+        self.assertEqual('/name varchar(42) /primary key',
                          ColumnDef(Identifier('name', True), VarCharTy(42), True).to_sql())
-        self.assertEqual('age integer,',
+        self.assertEqual('age integer',
                          ColumnDef(Identifier('age', False), IntegerTy(), False).to_sql())
-        self.assertEqual('height float,',
+        self.assertEqual('height float',
                          ColumnDef(Identifier('height', False), FloatTy(), False).to_sql())
 
     def test_result_column(self):
