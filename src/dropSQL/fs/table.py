@@ -212,6 +212,11 @@ class Table:
                 fixed[self.get_columns()[i].name] = decoded[i]
         return fixed
 
+    def select_all(self):
+        result = []
+        for i in range(0, self.count_records()):
+            result.append(self.select(i))
+
     def _validate_insert_values(self, values: Dict[Identifier, Literal]):
         """
         ensure all columns of this table are present
@@ -219,21 +224,20 @@ class Table:
         assert values.keys() == {column.name for column in self.get_columns()}
 
     def _calculate_record_size(self) -> int:
-        s = 0
-        for column in self.get_columns():
-            if isinstance(column.ty, IntegerTy):
-                s += 4
-            elif isinstance(column.ty, FloatTy):
-                s += 4
-            elif isinstance(column.ty, VarCharTy):
-                s += column.ty.width
-            else:
-                raise NotImplementedError
-
-        return s
+        # s = 1
+        # for column in self.get_columns():
+        #     if isinstance(column.ty, IntegerTy):
+        #         s += 4
+        #     elif isinstance(column.ty, FloatTy):
+        #         s += 4
+        #     elif isinstance(column.ty, VarCharTy):
+        #         s += column.ty.width
+        #     else:
+        #         raise NotImplementedError
+        return struct.calcsize(self._make_struct_format_string())
 
     def _make_struct_format_string(self):
-        res = ''
+        res = 'c'
         for column in self.get_columns():
             if isinstance(column.ty, IntegerTy):
                 res += 'i'
@@ -244,8 +248,12 @@ class Table:
         return res
 
     def _decode_record(self, data_block, page_offset):
-        return struct.unpack(self._make_struct_format_string(),
-                             data_block[page_offset: page_offset + self._calculate_record_size()])
+        result = struct.unpack(self._make_struct_format_string(),
+                               data_block[page_offset: page_offset + self._calculate_record_size()])
+        if result[0] == 'd':
+            raise RuntimeError("Record is dead")
+        else:
+            return result[1:]
 
     def get_column_by_name(self, name: Identifier) -> ColumnDef:
         for column in self.get_columns():
@@ -256,7 +264,7 @@ class Table:
         """
         assume that value types correspond to column types.
         """
-        t = []
+        t = ['a']  # alive
         for k, v in values.items():
             if isinstance(v, String):
                 t.append(v.value.encode("UTF-8"))
