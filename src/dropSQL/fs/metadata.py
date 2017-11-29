@@ -1,4 +1,4 @@
-from dropSQL.fs.block import Block
+from .block import Block, BLOCK_SIZE
 from .block_storage import BlockStorage
 
 
@@ -15,8 +15,8 @@ class Metadata:
         try:
             block = self.connection.read_block(0)
         except AssertionError:
-            block = Block(b'\0' * 4096)
-        block.data = encoded + block.data[len(encoded):4096]
+            block = Block(b'\0' * BLOCK_SIZE)
+        block.data = encoded + block.data[len(encoded):BLOCK_SIZE]
         self.connection.write_block(0, block)
 
     def get_data_blocks_count(self) -> int:
