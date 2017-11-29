@@ -22,26 +22,36 @@ class LayoutCase(TestCase):
                          msg="Initial data blocks count is not zero")
 
         tables = connection.get_tables()
-        for i, table in enumerate(tables):
+        for index, table in enumerate(tables):
             table: Table = table
 
-            table_name = "Table {}!".format(i)
+            table_name = "Table {}!".format(index)
             table.set_table_name(table_name)
             assert table.get_table_name() == table_name, "Failed to read table name"
-            table.add_column(ColumnDef(Identifier("int 1"), IntegerTy()))
-            table.add_column(ColumnDef(Identifier("int 2"), IntegerTy()))
-            table.add_column(ColumnDef(Identifier("float 1"), FloatTy()))
-            table.add_column(ColumnDef(Identifier("float 2"), FloatTy()))
-            table.add_column(ColumnDef(Identifier("string 1"), VarCharTy(123)))
-            table.add_column(ColumnDef(Identifier("string 2"), VarCharTy(321)))
-            table.insert({Identifier("int 1")   : Integer(1),
-                          Identifier("int 2")   : Integer(2),
-                          Identifier("float 1") : Float(2.71),
-                          Identifier("float 2") : Float(3.14),
-                          Identifier("string 1"): VarChar("meow"),
-                          Identifier("string 2"): VarChar("purr")})
-            sys.stderr.write(str(table.select(0)))
-            # sys.stderr.write('Record count: ' + str(table.count_records()))
-            sys.stderr.write(str(table.get_columns()) + "\n")
+            table.add_column(ColumnDef(Identifier("ind"), IntegerTy()))
+            table.add_column(ColumnDef(Identifier("text"), VarCharTy(15)))
+            for i in range(0, 10 ** 3):
+                # sys.stderr.write("Inserting record {} into {}\n".format(i, index))
+                table.insert({Identifier("ind"): Integer(i),
+                              Identifier("text"): VarChar("qwerty123456")})
+                if i % 3 == 0:
+                    table.delete(i)
+                if i % 3 == 1:
+                    table.update(i, {Identifier("ind"): Integer(-i),
+                                     Identifier("text"): VarChar("123456qwerty")})
+                try:
+                    values = table.select(i)
+                    assert values[Identifier("ind")] == i or values[Identifier("ind")] == -i, \
+                        "received({}): {}".format(i, values[Identifier("ind")])
+                    assert values[Identifier("text")] == "qwerty123456" or values[Identifier("text")] == "123456qwerty", \
+                        "received({}): {}".format(i, values[Identifier("text")])
+                except AttributeError:
+                    # sys.stderr.write("Record {} is dead\n".format(i))
+                    # record deleted
+                    # shitty code ♥
+                    pass
+            sys.stderr.write('Record count: {}\n'.format(table.count_records()))
+            sys.stderr.write('{}\n'.format(str(table.get_columns())))
+            break
 
         connection.close()
