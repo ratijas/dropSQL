@@ -1,11 +1,13 @@
 from typing import *
 
-from .ast import AstStmt
+from dropSQL.generic import *
+from dropSQL.parser.streams import *
+from dropSQL.parser.tokens import *
+from .ast import AstStmt, FromSQL
 from .expression import Expression
-from .identifier import Identifier
 
 
-class InsertInto(AstStmt):
+class InsertInto(AstStmt, FromSQL['InsertInto']):
     def __init__(self, table: Identifier, columns: List[Identifier], values: List[List[Expression]]) -> None:
         super().__init__()
 
@@ -32,3 +34,73 @@ class InsertInto(AstStmt):
         stmt += ' /drop'
 
         return stmt
+
+    @classmethod
+    def from_sql(cls, tokens: Stream[Token]) -> IResult['InsertInto']:
+        """
+        /insert_stmt
+            : "/insert" "into" /table_name "(" /columns_names ")" "values" values /drop
+            ;
+        """
+        # next item must be the "/insert" token
+        t = tokens.next().and_then(Cast(Insert))
+        if not t: return IErr(t.err())
+
+        t = tokens.next().and_then(Cast(Into))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        t = tokens.next().and_then(Cast(Identifier))
+        if not t: return IErr(t.err().empty_to_incomplete())
+        table = t.ok()
+
+        t = tokens.next().and_then(Cast(LParen))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        t = CommaSeparated(IdentFromSQL, tokens).collect()
+        if not t: return IErr(t.err().empty_to_incomplete())
+        columns = t.ok()
+
+        t = tokens.next().and_then(Cast(RParen))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        t = tokens.next().and_then(Cast(Values))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        values = []
+
+        t = tokens.next().and_then(Cast(Drop))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        return IOk(InsertInto(table, columns, values))
+
+    def execute(self, db, args: List[Any] = ()) -> Result[None, None]:
+        raise NotImplementedError
+
+
+class IdentFromSQL(FromSQL[Identifier]):
+    @classmethod
+    def from_sql(cls, tokens: Stream[Token]) -> IResult[Identifier]:
+        t = tokens.next().and_then(Cast(Identifier))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        return IOk(t.ok())
+
+
+class CommaSeparated(Generic[T], Stream[T]):
+    def __init__(self, ty: Type[FromSQL[T]], tokens: Stream[Token]):
+        super().__init__()
+
+        self.ty = ty
+        self.tokens = tokens
+        self.first = True
+
+    def next_impl(self) -> IResult[T]:
+        if self.first:
+            self.first = False
+
+        else:
+            t = self.tokens.peek().and_then(Cast(Comma))
+            if not t: return IErr(Empty())
+            self.tokens.next()
+
+        return self.ty.from_sql(self.tokens)

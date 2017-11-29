@@ -1,5 +1,6 @@
 from typing import *
 
+from dropSQL.generic import *
 from .ast import AstStmt
 from .expression import Expression
 from .identifier import Identifier
@@ -36,3 +37,6 @@ class UpdateSet(AstStmt):
 
         stmt += ' /drop'
         return stmt
+
+    def execute(self, db, args: List[Any] = ()) -> Result[None, None]:
+        raise NotImplementedError
