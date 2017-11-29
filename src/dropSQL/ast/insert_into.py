@@ -6,9 +6,19 @@ from dropSQL.parser.tokens import *
 from .ast import AstStmt, FromSQL
 from .expression import Expression
 
+ValueType = List[Expression]
+ValuesType = List[ValueType]
+
+
+def count_check(expected: int, values: ValuesType) -> IResult[None]:
+    for value in values:
+        if len(value) != expected:
+            return IErr(Syntax(f'{expected} expressions', str(len(value))))
+    return IOk(None)
+
 
 class InsertInto(AstStmt, FromSQL['InsertInto']):
-    def __init__(self, table: Identifier, columns: List[Identifier], values: List[List[Expression]]) -> None:
+    def __init__(self, table: Identifier, columns: List[Identifier], values: ValuesType) -> None:
         super().__init__()
 
         self.table = table
@@ -66,10 +76,15 @@ class InsertInto(AstStmt, FromSQL['InsertInto']):
         t = tokens.next().and_then(Cast(Values))
         if not t: return IErr(t.err().empty_to_incomplete())
 
-        values = []
+        t = CommaSeparated(ValueFromSQL, tokens).collect()
+        if not t: return IErr(t.err().empty_to_incomplete())
+        values = t.ok()
 
         t = tokens.next().and_then(Cast(Drop))
         if not t: return IErr(t.err().empty_to_incomplete())
+
+        c = count_check(len(columns), values)
+        if not c: return IErr(c.err())
 
         return IOk(InsertInto(table, columns, values))
 
@@ -84,6 +99,22 @@ class IdentFromSQL(FromSQL[Identifier]):
         if not t: return IErr(t.err().empty_to_incomplete())
 
         return IOk(t.ok())
+
+
+class ValueFromSQL(FromSQL[ValueType]):
+    @classmethod
+    def from_sql(cls, tokens: Stream[Token]) -> IResult[ValueType]:
+        t = tokens.next().and_then(Cast(LParen))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        t = CommaSeparated(Expression, tokens).collect()
+        if not t: return IErr(t.err().empty_to_incomplete())
+        value = t.ok()
+
+        t = tokens.next().and_then(Cast(RParen))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        return IOk(value)
 
 
 class CommaSeparated(Generic[T], Stream[T]):
