@@ -9,7 +9,8 @@ class StatementsTestCase(TestCase):
                                 '/drop table if exists files /drop\n'
                                 '/insert into /a(b, c) values (13, 37) /drop\n'
                                 '/delete from /friends /where 1 /= 2 /drop\n'
+                                '/update book /set page = 42 /where title = \'The Bible\' /drop\n'
                                 )
         stmts = s.collect()
         self.assertTrue(stmts)
-        self.assertEqual(len(stmts.ok()), 4)
+        self.assertEqual(len(stmts.ok()), 5)

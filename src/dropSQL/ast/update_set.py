@@ -1,9 +1,10 @@
 from typing import *
 
+from dropSQL.ast.comma_separated import CommaSeparated
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
-from .ast import AstStmt
+from .ast import AstStmt, FromSQL
 from .expression import Expression
 from .identifier import Identifier
 from .where import WhereFromSQL
@@ -59,7 +60,9 @@ class UpdateSet(AstStmt):
         t = tokens.next().and_then(Cast(SetKw))
         if not t: return IErr(t.err().empty_to_incomplete())
 
-        # TODO
+        t = CommaSeparated(Assignment, tokens).collect()
+        if not t: return IErr(t.err().empty_to_incomplete())
+        assign = t.ok()
 
         t = WhereFromSQL.from_sql(tokens)
         if not t: return IErr(t.err().empty_to_incomplete())
@@ -72,3 +75,26 @@ class UpdateSet(AstStmt):
 
     def execute(self, db, args: List[Any] = ()) -> Result[None, None]:
         raise NotImplementedError
+
+
+class Assignment(FromSQL[Tuple[Identifier, Expression]]):
+    @classmethod
+    def from_sql(cls, tokens: Stream[Token]) -> IResult[Tuple[Identifier, Expression]]:
+        """
+        /assignment
+            : /column_name "=" expr
+            ;
+        """
+        t = tokens.next().and_then(Cast(Identifier))
+        if not t: return IErr(t.err().empty_to_incomplete())
+        lvalue = t.ok()
+
+        t = tokens.next().and_then(Cast(Operator))
+        if not t: return IErr(t.err().empty_to_incomplete())
+        if t.ok().operator != Operator.EQ: return IErr(Syntax('=', str(t)))
+
+        t = Expression.from_sql(tokens)
+        if not t: return IErr(t.err().empty_to_incomplete())
+        e = t.ok()
+
+        return IOk((lvalue, e))

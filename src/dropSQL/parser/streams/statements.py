@@ -33,6 +33,9 @@ class Statements(Stream[AstStmt]):
         if isinstance(tok, Delete):
             return DeleteFrom.from_sql(self.tokens)
 
+        if isinstance(tok, Update):
+            return UpdateSet.from_sql(self.tokens)
+
         # elif isinstance(tok, Select): ...
 
         return Err(Syntax('/create, /drop, /insert, /delete, /update or /select', str(tok)))
