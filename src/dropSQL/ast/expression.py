@@ -1,9 +1,10 @@
 import abc
 from typing import *
 
-from .identifier import Identifier
-from dropSQL.parser.tokens import Operator
-from .ast import Ast
+from dropSQL.generic import *
+from dropSQL.parser.streams import *
+from dropSQL.parser.tokens import *
+from .ast import Ast, FromSQL
 
 __all__ = [
     'Expression',
@@ -18,7 +19,72 @@ __all__ = [
 ]
 
 
-class Expression(Ast, metaclass=abc.ABCMeta): pass
+class Expression(Ast, FromSQL['Expression'], metaclass=abc.ABCMeta):
+    @classmethod
+    def from_sql(cls, tokens: Stream[Token]) -> IResult['Expression']:
+        """
+        expr
+            : expr binary_operator expr
+            | literal
+            | placeholder
+            | /table_name /column_name
+            |             /column_name
+            | "(" expr ")"
+            ;
+        """
+        res = cls.parse_no_binary(tokens)
+        if not res: return IErr(res.err())
+        lhs = res.ok()
+
+        # try binary operator
+        t = tokens.peek().and_then(Cast(Operator))
+        if not t: return IOk(lhs)
+        op = t.ok()
+        tokens.next()
+
+        res = cls.from_sql(tokens)
+        if not res: return IErr(res.err().empty_to_incomplete())
+        rhs = res.ok()
+
+        return IOk(ExpressionBinary(op, lhs, rhs))
+
+    @classmethod
+    def parse_no_binary(cls, tokens: Stream[Token]) -> IResult['Expression']:
+        t = tokens.next()
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        tok = t.ok()
+        if isinstance(tok, Integer):
+            return IOk(ExpressionLiteralInt(tok.value))
+
+        if isinstance(tok, Float):
+            return IOk(ExpressionLiteralFloat(tok.value))
+
+        if isinstance(tok, VarChar):
+            return IOk(ExpressionLiteralVarChar(tok.value))
+
+        if isinstance(tok, Placeholder):
+            return IOk(ExpressionPlaceholder(tok.index))
+
+        if isinstance(tok, Identifier):
+            t = tokens.peek().and_then(Cast(Identifier))
+            if t:
+                tokens.next()
+                return IOk(ExpressionReference(tok, t.ok()))
+
+            else:
+                return IOk(ExpressionReference(None, tok))
+
+        if isinstance(tok, LParen):
+            expr = cls.from_sql(tokens)
+            if not expr: return IErr(expr.err().empty_to_incomplete())
+
+            t = tokens.next().and_then(Cast(RParen))
+            if not t: return IErr(t.err().empty_to_incomplete())
+
+            return IOk(ExpressionParen(expr.ok()))
+
+        return Err(Syntax('expression', str(tok)))
 
 
 T = TypeVar('T', int, float, str)
@@ -29,6 +95,9 @@ class ExpressionLiteral(Expression, Generic[T]):
         super().__init__()
 
         self.value: T = lit
+
+    def __eq__(self, o: object) -> bool:
+        return isinstance(o, type(self)) and self.value == o.value
 
 
 class ExpressionLiteralInt(ExpressionLiteral[int]):
