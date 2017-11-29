@@ -11,7 +11,7 @@ from dropSQL.fs.block import Block
 class DBFile:
     def __init__(self, filename):
         self.filename = filename
-        self.file = open(filename, "r+b")
+        self.file = open(filename, "r+b", 2**23)
         self.file.write(b'\0' * 4096 * 17)
 
     def get_metadata(self):
@@ -39,7 +39,7 @@ class DBFile:
         self.file.write(b'\0' * 4096)
         c = self.get_metadata().get_data_blocks_count()
         self.get_metadata().set_data_blocks_count(c + 1)
-        return c + 16
+        return c + 17
 
     def close(self):
         self.file.flush()
