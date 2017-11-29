@@ -6,6 +6,7 @@ from dropSQL.parser.tokens import *
 from .ast import AstStmt
 from .expression import Expression
 from .identifier import Identifier
+from .where import WhereFromSQL
 
 
 class DeleteFrom(AstStmt):
@@ -44,16 +45,9 @@ class DeleteFrom(AstStmt):
         if not t: return IErr(t.err().empty_to_incomplete())
         table = t.ok()
 
-        t = tokens.peek().and_then(Cast(Where))
-        if t:
-            tokens.next().ok()
-            e = Expression.from_sql(tokens)
-            if not e: return IErr(e.err().empty_to_incomplete())
-
-            where = e.ok()
-
-        else:
-            where = None
+        t = WhereFromSQL.from_sql(tokens)
+        if not t: return IErr(t.err().empty_to_incomplete())
+        where = t.ok()
 
         t = tokens.next().and_then(Cast(Drop))
         if not t: return IErr(t.err().empty_to_incomplete())
