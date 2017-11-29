@@ -112,9 +112,12 @@ class CreateTable(AstStmt):
                     return Ok(False)
                 else:
                     return Err(None)
+
             else:
                 if table.get_table_name().identifier == '':
                     table.set_table_name(self.table)
+                    for column in self.columns:
+                        table.add_column(column)
                     return Ok(True)
 
         return Err(None)

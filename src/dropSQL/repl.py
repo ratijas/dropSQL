@@ -128,4 +128,6 @@ class ListTables(DotCommand):
         print('tables in the database:')
         for i, table in enumerate(conn.file.get_tables()):
             name = table.get_table_name()
-            print(f'{i}. {name}')
+            columns = ", ".join(column.to_sql() for column in table.get_columns())
+            if name.identifier != '':
+                print(f'{i}. {name} ({columns})')
