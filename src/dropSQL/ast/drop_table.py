@@ -1,5 +1,8 @@
 from typing import *
 
+from dropSQL.generic import *
+from dropSQL.parser.streams import *
+from dropSQL.parser.tokens import *
 from .ast import AstStmt
 from .existence import IfExists
 from .identifier import Identifier
@@ -23,3 +26,30 @@ class DropTable(AstStmt):
         stmt += ' /drop'
 
         return stmt
+
+    @classmethod
+    def from_sql(cls, tokens: Stream[Token]) -> IResult['DropTable']:
+        """
+        /drop_stmt
+            : "/drop" "table" existence /table_name /drop
+            ;
+        """
+        # next item must be the first "/drop" token
+        t = tokens.next().and_then(Cast(Drop))
+        if not t: return IErr(t.err())
+
+        t = tokens.next().and_then(Cast(Table))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        t = IfExists.from_sql(tokens)
+        if not t: return IErr(t.err().empty_to_incomplete())
+        if_exists = t.ok()
+
+        t = tokens.next().and_then(Cast(Identifier))
+        if not t: return IErr(t.err().empty_to_incomplete())
+        table = t.ok()
+
+        t = tokens.next().and_then(Cast(Drop))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        return IOk(DropTable(if_exists, table))
