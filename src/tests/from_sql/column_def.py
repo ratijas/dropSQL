@@ -11,8 +11,6 @@ class ColumnDefTestCase(TestCase):
         res = ColumnDef.from_sql(Tokens.from_str(sql))
         self.assertTrue(res)
 
-        print('A' * 100)
-        print(Tokens.from_str(sql).collect())
         res = CreateTable.parse_columns(Tokens.from_str(sql))
         self.assertTrue(res)
         self.assertEqual(2, len(res.ok()))

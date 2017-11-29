@@ -6,7 +6,6 @@ from dropSQL.parser.tokens import *
 from .ast import AstStmt
 from .column_def import ColumnDef
 from .existence import IfNotExists
-from .identifier import Identifier
 
 
 class CreateTable(AstStmt):

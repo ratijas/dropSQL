@@ -5,7 +5,6 @@ from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
 from .ast import AstStmt
 from .existence import IfExists
-from .identifier import Identifier
 
 
 class DropTable(AstStmt):
