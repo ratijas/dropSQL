@@ -2,7 +2,6 @@ from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
 from .ast import Ast
-from .identifier import Identifier
 from .ty import Ty
 
 
