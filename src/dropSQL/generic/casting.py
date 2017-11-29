@@ -15,8 +15,8 @@ def Cast(ty: Type[T]) -> Callable[[Any], IResult[T]]:
 
     def inner(o: Any) -> IResult[T]:
         if isinstance(o, ty):
-            return Ok(o)
+            return IOk(o)
         else:
-            return Err(Syntax(ty.__name__, str(o)))
+            return IErr(Syntax(ty.__name__, str(o)))
 
     return inner

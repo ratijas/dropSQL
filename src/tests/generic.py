@@ -2,7 +2,6 @@ from unittest import TestCase
 
 from dropSQL.generic import *
 from dropSQL.parser.tokens import *
-from generic.error import *
 
 
 class GenericTestCase(TestCase):

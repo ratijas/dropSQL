@@ -5,7 +5,7 @@ from .stream import Stream
 
 
 class Characters(Stream[str]):
-    def __init__(self, string: StringIO):
+    def __init__(self, string: StringIO) -> None:
         super().__init__()
 
         self.string = string
@@ -14,7 +14,7 @@ class Characters(Stream[str]):
         char = self.string.read(1)
 
         if char != '':
-            return Ok(char)
+            return IOk(char)
 
         else:
-            return Err(Empty())
+            return IErr(Empty())

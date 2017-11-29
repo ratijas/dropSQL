@@ -1,10 +1,8 @@
+import sys
 from unittest import TestCase
 
 from dropSQL.ast import ColumnDef, IntegerTy, FloatTy, VarCharTy
 from dropSQL.fs.db_file import DBFile
-import os
-import sys
-
 from dropSQL.fs.table import Table
 from dropSQL.parser.tokens.identifier import Identifier
 from dropSQL.parser.tokens.literal import Integer, Float, VarChar
@@ -12,18 +10,21 @@ from dropSQL.parser.tokens.literal import Integer, Float, VarChar
 
 class LayoutCase(TestCase):
     def test(self):
-        os.remove("test.dropdb")
         open("test.dropdb", "w").close()
         connection = DBFile("test.dropdb")
 
         db_name = "Database name!"
         metadata = connection.get_metadata()
         metadata.set_name(db_name)
-        assert metadata.get_name() == db_name, "Failed to read database name: {}".format(metadata.get_name())
-        assert metadata.get_data_blocks_count() == 0, "Initial data blocks count is not zero"
+        self.assertEqual(metadata.get_name(), db_name,
+                         msg="Failed to read database name: {}".format(metadata.get_name()))
+        self.assertEqual(metadata.get_data_blocks_count(), 0,
+                         msg="Initial data blocks count is not zero")
 
         tables = connection.get_tables()
         for i, table in enumerate(tables):
+            table: Table = table
+
             table_name = "Table {}!".format(i)
             table.set_table_name(table_name)
             assert table.get_table_name() == table_name, "Failed to read table name"

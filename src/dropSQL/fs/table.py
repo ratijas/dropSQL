@@ -1,12 +1,11 @@
+import struct
+import sys
 from typing import *
 
 from dropSQL.ast import *
-from dropSQL.fs.db_file import DBFile
 from dropSQL.fs.block import Block
-import sys
-import struct
-
-from dropSQL.parser.tokens.literal import Literal, String
+from dropSQL.fs.db_file import DBFile
+from dropSQL.parser.tokens.literal import Literal, VarChar
 
 
 class Table:
@@ -266,7 +265,7 @@ class Table:
         """
         t = ['a']  # alive
         for k, v in values.items():
-            if isinstance(v, String):
+            if isinstance(v, VarChar):
                 t.append(v.value.encode("UTF-8"))
             else:
                 t.append(v.value)

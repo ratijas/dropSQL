@@ -11,28 +11,33 @@ class Tokens(Stream[Token]):
         self.characters = characters
 
     def next_impl(self, skip_whitespace: bool = True) -> IResult[Token]:
-        print('old current:', self.characters.current())
+        """
+        underlying stream points to current character, token parser uses it.
+        """
+        # initial condition
+        if self.characters.current().is_err() and self.characters.current().err().is_empty():
+            self.characters.next()
 
-        self.characters.next()
-        if skip_whitespace:
-            self.skip_whitespace()
-
-        print('new current:', self.characters.current())
-
+        if skip_whitespace: self.skip_whitespace()
         if self.characters.current().is_err():
             assert self.characters.current().err().is_empty()
             return IErr(Empty())
 
-        char = self.characters.current().ok_or('')
+        char = self.characters.current().ok()
         next_char = self.characters.peek().ok_or('')
+        assert self.characters.current().ok_or('') == char, f'{self.characters.current(), char}'
+        assert self.characters.peek().ok_or('') == next_char
 
         if char == ',':
+            self.characters.next()
             return IOk(Comma())
 
         elif char == '(':
+            self.characters.next()
             return IOk(LParen())
 
         elif char == ')':
+            self.characters.next()
             return IOk(RParen())
 
         elif char.isalpha():
@@ -45,32 +50,24 @@ class Tokens(Stream[Token]):
             return self.parse_num()
 
         elif char == '-':
-            if next_char == '-':
-                # comment, skip until EOL or EOF
-                def not_nl(ch: str) -> bool:
-                    return not (ch == '\n' or ch == '\r')
-
-                while self.characters.next().map(not_nl).ok_or(False):
-                    pass
-
-                return self.next_impl()
-
-            else:
-                return IOk(Operator('-'))
+            return self.parse_dash()
 
         elif char == '\'':
             return self.parse_string()
 
         # <= /= >=
         elif char in '</>' and next_char == '=':
-            self.characters.next()  # consume next_char
+            self.characters.next()  # consume both
+            self.characters.next()
             return IOk(Operator(char + next_char))
 
         # * / + - < = >
         elif char in ('*', '/', '+', '-', '<', '=', '>'):
+            self.characters.next()
             return IOk(Operator(char))
 
         elif char == '?':
+            self.characters.next()
             t = self.next_impl(False).and_then(Cast(Integer))
             if not t: return IErr(t.err())
 
@@ -78,7 +75,6 @@ class Tokens(Stream[Token]):
             return IOk(Placeholder(index.value))
 
         else:
-            self.characters.back()
             return IErr(Syntax('token', char))
 
     # def only_whitespace_left(self) -> bool:
@@ -124,18 +120,17 @@ class Tokens(Stream[Token]):
         if self.characters.current().is_err():
             return IErr(Incomplete())
         else:
+            self.characters.next()
             return IOk(VarChar(string))
 
     def parse_num(self) -> IResult[Token]:
         num: str = self.characters.current().ok()
 
-        # @formatter:off
-        while (self.characters.peek().is_ok() and
-                (self.characters.peek().ok().isdigit() or
-                 self.characters.peek().ok() == '.')):
-            char = self.characters.next().ok()
-            num += char
-        # @formatter:on
+        def is_digit(ch: str) -> bool:
+            return (ch.isdigit()) or (ch == '.')
+
+        while self.characters.next().map(is_digit).ok_or(False):
+            num += self.characters.current().ok()
 
         if '.' in num:
             try:
@@ -150,3 +145,18 @@ class Tokens(Stream[Token]):
                 return IOk(Integer(i))
             except (ValueError, OverflowError) as _:
                 return IErr(Syntax('int', num))
+
+    def parse_dash(self) -> IResult[Token]:
+        if self.characters.next().ok_or('') == '-':
+            return self.parse_comment()
+
+        else:
+            return IOk(Operator('-'))
+
+    def parse_comment(self) -> IResult[Token]:
+        # -- comment, skip until EOL or EOF. cursor is at the second dash
+        def not_nl(ch: str) -> bool:
+            return (ch != '\n') and (ch != '\r')
+
+        while self.characters.next().map(not_nl).ok_or(False): pass
+        return self.next_impl()
