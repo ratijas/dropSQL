@@ -1,11 +1,11 @@
-from dropSQL.ast import *
+from dropSQL.ast.stmt import *
 from dropSQL.generic import *
 from dropSQL.parser.tokens import *
 from .stream import Stream
 from .tokens import Tokens
 
 
-class Statements(Stream[ast.AstStmt]):
+class Statements(Stream[AstStmt]):
     def __init__(self, tokens: Stream[Token]) -> None:
         super().__init__()
 
@@ -15,16 +15,16 @@ class Statements(Stream[ast.AstStmt]):
     def from_str(cls, source: str) -> 'Statements':
         return Statements(Tokens.from_str(source))
 
-    def next_impl(self) -> IResult[ast.AstStmt]:
-        return IErr(Empty())
+    def next_impl(self) -> IResult[AstStmt]:
 
-        # tok = self.tokens.next()
-        # if tok.is_err(): return Err(tok.err())
-        #
-        # tok = tok.ok()
-        #
-        # if isinstance(tok, Create):
-        #     return CreateTableStmt.parse(self.tokens)
-        #
-        # else:
-        #     return Err(Syntax('/create', str(tok)))
+        t = self.tokens.peek()
+        if not t: return Err(t.err())
+        tok = t.ok()
+
+        if isinstance(tok, Drop):
+            return DropTable.from_sql(self.tokens)
+
+        # elif isinstance(tok, Select): ...
+
+        else:
+            return Err(Syntax('/drop', str(tok)))
