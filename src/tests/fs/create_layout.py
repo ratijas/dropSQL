@@ -41,9 +41,9 @@ class LayoutCase(TestCase):
                                      Identifier("text"): VarChar("123456qwerty")})
                 try:
                     values = table.select(i)
-                    assert values[Identifier("ind")] == i or values[Identifier("ind")] == -i, \
-                        "received({}): {}".format(i, values[Identifier("ind")])
-                    assert values[Identifier("text")] == "qwerty123456" or values[Identifier("text")] == "123456qwerty", \
+                    assert values[0] == i or values[0] == -i, \
+                        "received({}): {}".format(i, values[0])
+                    assert values[1] == "qwerty123456" or values[1] == "123456qwerty", \
                         "received({}): {}".format(i, values[Identifier("text")])
                 except AttributeError:
                     # sys.stderr.write("Record {} is dead\n".format(i))
