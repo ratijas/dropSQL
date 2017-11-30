@@ -19,3 +19,7 @@ class Context:
         Empty context with empty row and w/o arguments for testing purposes.
         """
         return Context(Row.empty(), ())
+
+    @classmethod
+    def with_args(cls, args: ARGS_TYPE) -> 'Context':
+        return Context(Row.empty(), args)

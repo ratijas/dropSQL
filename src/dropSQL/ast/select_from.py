@@ -1,6 +1,10 @@
 from typing import *
 
+from dropSQL.engine.row_set.filtered import FilteredRowSet
+from dropSQL.engine.row_set.projection import ProjectionRowSet
+from dropSQL.engine.row_set.rename_table import RenameTableRowSet
 from dropSQL.engine.row_set.table import TableRowSet
+from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
@@ -84,10 +88,19 @@ class SelectFrom(AstStmt):
 
         return IOk(SelectFrom(columns, table, where=where))
 
-    def execute(self, db: 'fs.DBFile', args: List[Any] = ()) -> Result['RowSet', str]:
+    def execute(self, db: 'fs.DBFile', args: ARGS_TYPE = ()) -> Result['RowSet', str]:
 
         table = db.get_table_by_name(self.table.name)
         if table is None: return Err(f'Table {self.table.name} not found')
 
         rs = TableRowSet(table)
+
+        if self.table.alias is not None:
+            rs = RenameTableRowSet(rs, self.table.alias)
+
+        if self.where is not None:
+            rs = FilteredRowSet(rs, self.where, args)
+
+        rs = ProjectionRowSet(rs, self.columns, args)
+
         return Ok(rs)

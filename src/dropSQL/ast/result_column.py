@@ -6,6 +6,12 @@ from dropSQL.parser.tokens import *
 from .alias import AliasedExpression
 from .ast import Ast, FromSQL
 
+__all__ = [
+    'ResultColumn',
+    'ResultStar',
+    'ResultExpression',
+]
+
 
 class ResultColumn(Ast, FromSQL['ResultColumn'], metaclass=abc.ABCMeta):
     """

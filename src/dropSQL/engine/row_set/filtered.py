@@ -4,7 +4,7 @@ from .row_set import RowSet
 from ..column import Column
 from ..context import Context
 from ..row import Row
-from ..types import DB_TYPE
+from ..types import *
 
 if TYPE_CHECKING:
     from dropSQL.ast.expression import Expression
@@ -33,7 +33,7 @@ class FilteredRowSet(RowSet):
     For each row in the underlying row set
     """
 
-    def __init__(self, inner: RowSet, expr: 'Expression', args: Tuple[DB_TYPE]) -> None:
+    def __init__(self, inner: RowSet, expr: 'Expression', args: ARGS_TYPE) -> None:
         super().__init__()
 
         self.inner = inner
@@ -44,9 +44,9 @@ class FilteredRowSet(RowSet):
         return self.inner.columns()
 
     def iter(self) -> Iterator[Row]:
+        ctx = Context.with_args(self.args)
         for row in self.inner.iter():
-            # TODO
-            ctx = Context(row, self.args)
+            ctx.row = row
             res = self.expr.eval_with(ctx)
             if not res: raise ValueError(res.err())
             if res.ok() != 0:

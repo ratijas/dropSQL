@@ -281,10 +281,10 @@ class ExpressionBinary(Expression):
                 return Ok(int(lhs <= rhs))
 
             elif op == Operator.AND:
-                return Ok(int(lhs and rhs))
+                return Ok(int(bool(lhs) and bool(rhs)))
 
             elif op == Operator.OR:
-                return Ok(int(lhs or rhs))
+                return Ok(int(bool(lhs) or bool(rhs)))
 
             else:
                 return Err(f'Unsupported operator: {op}')
