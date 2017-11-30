@@ -1,9 +1,11 @@
 from typing import *
 
+from dropSQL.generic import *
+from dropSQL.parser.streams import *
+from dropSQL.parser.tokens import *
 from .ast import AstStmt
 from .column_def import ColumnDef
 from .existence import IfNotExists
-from .identifier import Identifier
 
 
 class CreateTable(AstStmt):
@@ -27,7 +29,95 @@ class CreateTable(AstStmt):
         for col in self.columns:
             stmt += '\t'
             stmt += col.to_sql()
-            stmt += '\n'
+            stmt += ',\n'
         stmt += ') /drop'
 
         return stmt
+
+    @classmethod
+    def from_sql(cls, tokens: Stream[Token]) -> IResult['CreateTable']:
+        """
+        /create_stmt
+            : "/create" "table" existence /table_name "(" /columns_def ")" /drop
+            ;
+        """
+        # next item must be the '/create' token
+        t = tokens.next().and_then(Cast(Create))
+        if not t: return IErr(t.err())
+
+        t = tokens.next().and_then(Cast(Table))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        t = IfNotExists.from_sql(tokens)
+        if not t: return IErr(t.err().empty_to_incomplete())
+        if_not_exists = t.ok()
+
+        t = tokens.next().and_then(Cast(Identifier))
+        if not t: return IErr(t.err().empty_to_incomplete())
+        table = t.ok()
+
+        t = tokens.next().and_then(Cast(LParen))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        t = cls.parse_columns(tokens)
+        if not t: return IErr(t.err().empty_to_incomplete())
+        columns = t.ok()
+
+        t = tokens.next().and_then(Cast(RParen))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        t = tokens.next().and_then(Cast(Drop))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        return IOk(CreateTable(if_not_exists, table, columns))
+
+    @classmethod
+    def parse_columns(cls, tokens: Stream[Token]) -> IResult[List[ColumnDef]]:
+        """
+        /columns_def
+            : /column_def ("," /column_def)* ","?
+            ;
+        """
+        # next item must be start of column definition
+        # if return IOk, the next item must be ")"
+        columns = []
+
+        t = ColumnDef.from_sql(tokens)
+        if not t: return IErr(t.err())
+        columns.append(t.ok())
+
+        # don't `next` comma yet.  maybe it is ")"
+        while tokens.peek().and_then(Cast(Comma)):
+            tokens.next()
+            if tokens.peek().and_then(Cast(RParen)): break
+
+            t = ColumnDef.from_sql(tokens)
+            if not t: return IErr(t.err().empty_to_incomplete())
+            columns.append(t.ok())
+
+        t = tokens.peek().and_then(Cast(RParen))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        return IOk(columns)
+
+    def execute(self, db, args: List[Any] = ()) -> Result[bool, None]:
+        from dropSQL.fs import DBFile
+        db: DBFile = db
+
+        for table in db.get_tables():
+            name = table.get_table_name()
+
+            if name == self.table:
+                if self.if_not_exists is not None:  # error-tolerant
+                    return Ok(False)
+                else:
+                    return Err(None)
+
+            else:
+                if table.get_table_name().identifier == '':
+                    table.set_table_name(self.table)
+                    for column in self.columns:
+                        table.add_column(column)
+                    return Ok(True)
+
+        return Err(None)

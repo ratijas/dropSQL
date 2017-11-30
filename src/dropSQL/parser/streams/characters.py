@@ -10,6 +10,10 @@ class Characters(Stream[str]):
 
         self.string = string
 
+    @classmethod
+    def from_str(cls, source: str) -> 'Characters':
+        return Characters(StringIO(source))
+
     def next_impl(self) -> IResult[T]:
         char = self.string.read(1)
 

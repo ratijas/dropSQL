@@ -1,4 +1,3 @@
-from io import StringIO
 from unittest import TestCase
 
 from dropSQL.parser.streams import *
@@ -11,13 +10,13 @@ class TokensTestCase(TestCase):
         self.assertEqual('/drop', str(ident))
 
     def test_eof(self):
-        s = Characters(StringIO(''))
+        s = Characters.from_str('')
         tok = s.next()
         self.assertTrue(tok.is_err())
         self.assertTrue(tok.err())
 
     def test_punctuation(self):
-        s = Tokens(Characters(StringIO('( , )')))
+        s = Tokens(Characters.from_str('( , )'))
         tok = s.next().ok()
         self.assertIsInstance(tok, LParen)
         tok = s.next().ok()
@@ -28,7 +27,7 @@ class TokensTestCase(TestCase):
         self.assertFalse(res)
 
     def test_more_identifiers(self):
-        s = Tokens(Characters(StringIO('/create table if not exists /students /drop')))
+        s = Tokens(Characters.from_str('/create table if not exists /students /drop'))
         n = lambda: s.next().ok()
 
         tok = (n(), n(), n(), n(), n(), n(), n())
@@ -44,13 +43,13 @@ class TokensTestCase(TestCase):
         self.assertEqual(ident.identifier, 'students')
         self.assertTrue(ident.slash)
 
-        s = Tokens(Characters(StringIO('/file_id')))
+        s = Tokens(Characters.from_str('/file_id'))
         tok = s.next().ok()
         self.assertEqual(tok, Identifier('file_id'))
         self.assertFalse(s.next())
 
     def test_next_token_consistent_error(self):
-        s = Tokens(Characters(StringIO('file[id]')))
+        s = Tokens(Characters.from_str('file[id]'))
         res = s.next()
         self.assertTrue(res)
         res = s.next()
@@ -60,7 +59,7 @@ class TokensTestCase(TestCase):
         self.assertFalse(res)
 
     def test_literals(self):
-        s = Tokens(Characters(StringIO('42 15.37 \'UFO\'')))
+        s = Tokens.from_str('42 15.37 \'UFO\'')
 
         tok = s.next().ok()
         self.assertIsInstance(tok, Integer)
@@ -74,17 +73,17 @@ class TokensTestCase(TestCase):
         self.assertIsInstance(tok, VarChar)
         self.assertEqual('UFO', tok.value)
 
-        s = Tokens(Characters(StringIO(' \'not the...')))
+        s = Tokens.from_str(' \'not the...')
         tok = s.next()
         self.assertTrue(tok.is_err())
 
-        s = Tokens(Characters(StringIO(" 'abc\\' def' ")))
+        s = Tokens.from_str(" 'abc\\' def' ")
         tok = s.next().ok()
         self.assertEqual(tok, VarChar("abc' def"))
 
     def test_comment(self):
-        s = Tokens(Characters(StringIO('42, -- this is the answer\n'
-                                       '37  -- while this one is definitely not.\n')))
+        s = Tokens.from_str('42, -- this is the answer\n'
+                            '37  -- while this one is definitely not.\n')
         n = lambda: s.next().ok()
         tok = (n(), n(), n(), s.next())
 
@@ -94,7 +93,7 @@ class TokensTestCase(TestCase):
         self.assertTrue(tok[3].is_err())
 
     def test_operators(self):
-        s = Tokens(Characters(StringIO(
+        s = Tokens(Characters.from_str((
             '  *    >=   >    /=   /    /5        /and')))
         n = lambda: s.next().ok()
 
@@ -109,7 +108,7 @@ class TokensTestCase(TestCase):
         self.assertEqual(tok[7], Operator('/and'))
 
     def test_placeholder(self):
-        s = Tokens(Characters(StringIO('?1, ?32 ? 4')))
+        s = Tokens.from_str('?1, ?32 ? 4')
         n = lambda: s.next().ok()
         tok = (n(), n(), n(), s.next())
 
@@ -120,7 +119,7 @@ class TokensTestCase(TestCase):
 
     def test_all_keywords(self):
         def tok(s: str) -> Token:
-            return Tokens(Characters(StringIO(s))).next().ok()
+            return Tokens.from_str(s).next().ok()
 
         # @formatter:off
         self.assertIsInstance(tok('and'),        Operator)

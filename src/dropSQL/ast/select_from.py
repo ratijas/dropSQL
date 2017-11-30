@@ -1,5 +1,6 @@
 from typing import *
 
+from dropSQL.generic import *
 from .alias import AliasedTable
 from .ast import AstStmt
 from .expression import Expression
@@ -43,3 +44,6 @@ class SelectFrom(AstStmt):
         stmt += ' /drop'
 
         return stmt
+
+    def execute(self, db, args: List[Any] = ()) -> Result[None, None]:
+        raise NotImplementedError

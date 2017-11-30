@@ -35,7 +35,7 @@ class IdentifierBase(Token, metaclass=abc.ABCMeta):
 
 class Identifier(IdentifierBase):
     def __repr__(self) -> str:
-        return f'Identifier({super().__repr__()})'
+        return f'Identifier({str(self)})'
 
     def maybe_as_keyword(self) -> Token:
         from .ident_to_keyword import KEYWORDS
@@ -49,4 +49,4 @@ class Identifier(IdentifierBase):
 
 class Keyword(IdentifierBase):
     def __repr__(self) -> str:
-        return f'Keyword({super().__repr__()})'
+        return f'Keyword({self.__class__.__name__})'

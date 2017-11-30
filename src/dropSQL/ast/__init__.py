@@ -1,5 +1,6 @@
+from . import stmt
 from .alias import Alias, AliasedTable, AliasedExpression
-from .ast import Ast, AstStmt
+from .ast import Ast, AstStmt, FromSQL
 from .column_def import ColumnDef
 from .create_table import CreateTable
 from .delete_from import DeleteFrom
