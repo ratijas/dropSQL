@@ -5,11 +5,11 @@ from .alias import AliasedTable
 from .ast import Ast
 from .expression import Expression
 
-__all__ = (
+__all__ = [
     'JoinAst',
     'CrossJoin',
     'InnerJoin',
-)
+]
 
 
 class JoinAst(Ast, metaclass=abc.ABCMeta):
