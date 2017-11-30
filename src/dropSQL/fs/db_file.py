@@ -29,6 +29,9 @@ class DBFile(BlockStorage):
         if path == ":memory:":
             self.file = io.BytesIO()
         else:
+            if not os.path.exists(self.path):
+                with open(path, "w") as f:
+                    pass
             self.file = open(path, "r+b", buffering=(2 ** 23))
         self._allocate_base()
 
@@ -39,7 +42,7 @@ class DBFile(BlockStorage):
                 size = os.stat(self.path).st_size
 
         if size == 0:
-            self.file.seek(0, io.SEEK_SET)
+            self.file.seek(0)
             self.file.write(b'\0' * BLOCK_SIZE * 17)
 
     def get_metadata(self) -> Metadata:
