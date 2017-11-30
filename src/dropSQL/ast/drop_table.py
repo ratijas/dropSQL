@@ -61,8 +61,7 @@ class DropTable(AstStmt):
             name = table.get_table_name()
 
             if name == self.table:
-                # TODO: table.drop()
-                table.set_table_name(Identifier(''))
+                table.drop()
                 return Ok(True)
 
         if self.if_exists is not None:  # error-tolerant
