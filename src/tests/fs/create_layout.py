@@ -52,6 +52,8 @@ class LayoutCase(TestCase):
                     pass
             sys.stderr.write('Record count: {}\n'.format(table.count_records()))
             sys.stderr.write('{}\n'.format(str(table.get_columns())))
+            table.drop()
             break
+        sys.stderr.write('Tables: {}\n'.format([t.get_table_name() for t in connection.get_tables()]))
 
         connection.close()
