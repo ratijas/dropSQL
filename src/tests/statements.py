@@ -10,7 +10,8 @@ class StatementsTestCase(TestCase):
                                 '/insert into /a(b, c) values (13, 37) /drop\n'
                                 '/delete from /friends /where 1 /= 2 /drop\n'
                                 '/update book /set page = 42 /where title = \'The Bible\' /drop\n'
+                                '/select shell/as/bullet /from the gun /where calibre > 9000 /drop\n'
                                 )
         stmts = s.collect()
         self.assertTrue(stmts)
-        self.assertEqual(len(stmts.ok()), 5)
+        self.assertEqual(len(stmts.ok()), 6)

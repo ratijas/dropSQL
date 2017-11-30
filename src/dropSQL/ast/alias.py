@@ -1,6 +1,9 @@
 import abc
 from typing import *
 
+from dropSQL.generic import *
+from dropSQL.parser.streams import *
+from dropSQL.parser.tokens import *
 from .ast import Ast
 from .expression import Expression
 from .identifier import Identifier
@@ -12,12 +15,6 @@ class Alias(Ast, metaclass=abc.ABCMeta):
 
         self.alias = alias
 
-    def to_sql(self) -> str:
-        if self.alias is None:
-            return ''
-        else:
-            return f' /as {str(self.alias)}'
-
 
 class AliasedTable(Alias):
     def __init__(self, name: Identifier, alias: Optional[Identifier] = None) -> None:
@@ -27,8 +24,33 @@ class AliasedTable(Alias):
 
     def to_sql(self) -> str:
         s = str(self.name)
-        s += super().to_sql()
+        if self.alias is not None:
+            s += f' {str(self.alias)}'
         return s
+
+    @classmethod
+    def from_sql(cls, tokens: Stream[Token]) -> IResult['AliasedTable']:
+        """
+        /aliased_table
+            : /table_name /table_alias
+            ;
+
+        /table_alias
+            : /* empty */
+            | /identifier
+            ;
+        """
+        t = tokens.next().and_then(Cast(Identifier))
+        if not t: return IErr(t.err())
+        name = t.ok()
+
+        alias = None
+        t = tokens.peek().and_then(Cast(Identifier))
+        if t:
+            tokens.next()
+            alias = t.ok()
+
+        return IOk(AliasedTable(name, alias))
 
 
 class AliasedExpression(Alias):
@@ -39,5 +61,37 @@ class AliasedExpression(Alias):
 
     def to_sql(self) -> str:
         expr: str = self.expression.to_sql()
-        expr += super().to_sql()
+        if self.alias is not None:
+            expr += f' /as {str(self.alias)}'
         return expr
+
+    @classmethod
+    def from_sql(cls, tokens: Stream[Token]) -> IResult['AliasedExpression']:
+        """
+        /result_column
+            : "*"
+            | /aliased_expression
+            ;
+
+        /aliased_expression
+            : expr /expression_alias
+            ;
+
+        /expression_alias
+            : /* empty */
+            | /as /identifier
+            ;
+        """
+        t = Expression.from_sql(tokens)
+        if not t: return IErr(t.err())
+        expr = t.ok()
+
+        alias: Optional[Identifier] = None
+        t = tokens.peek().and_then(Cast(As))
+        if t:
+            tokens.next()
+            t = tokens.next().and_then(Cast(Identifier))
+            if not t: return IErr(t.err().empty_to_incomplete())
+            alias = t.ok()
+
+        return IOk(AliasedExpression(expr, alias))

@@ -31,8 +31,9 @@
 
 /select_stmt
     : "/select" /result_columns
-      "from" /from_body
-      /where_clause
+         "from" /from_body
+                /where_clause
+                /drop
     ;
 
 /result_columns

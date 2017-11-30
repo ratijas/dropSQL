@@ -1,16 +1,38 @@
 import abc
 
+from dropSQL.generic import *
+from dropSQL.parser.streams import *
+from dropSQL.parser.tokens import *
 from .alias import AliasedExpression
-from .ast import Ast
+from .ast import Ast, FromSQL
 
 
-class ResultColumn(Ast, metaclass=abc.ABCMeta):
+class ResultColumn(Ast, FromSQL['ResultColumn'], metaclass=abc.ABCMeta):
     """
-    Abstract base class for "/select col1, col2 + 1, *".
+    Abstract base class for "/select col1, col2 + 1 /as banana, *".
 
     - aliased expression
     - star
     """
+
+    @classmethod
+    def from_sql(cls, tokens: Stream[Token]) -> IResult['ResultColumn']:
+        """
+        /result_column
+            : "*"
+            | /aliased_expression
+            ;
+        """
+        t = tokens.peek().and_then(Cast(Operator))
+        if t:
+            if t.ok().operator != Operator.MUL: return IErr(Syntax('STAR or expression', str(t.ok())))
+            tokens.next().ok()
+            return IOk(ResultStar())
+
+        t = AliasedExpression.from_sql(tokens)
+        if not t: return IErr(t.err())
+
+        return IOk(ResultExpression(t.ok()))
 
 
 class ResultStar(ResultColumn):
