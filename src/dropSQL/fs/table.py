@@ -3,13 +3,16 @@ from typing import *
 
 from dropSQL.ast.column_def import ColumnDef
 from dropSQL.ast.ty import *
-from dropSQL.parser.tokens import Identifier, Literal, VarChar
+from dropSQL.generic import *
+from dropSQL.parser.tokens import Identifier
 from .block import Block, BLOCK_SIZE, POINTER_SIZE
 from .block_storage import BlockStorage
 
 BYTEORDER = 'big'
-INT_TY = 0
-FLOAT_TY = 0xffff
+INT = 0
+FLOAT = 0xffff
+DB_TYPE = Union[str, int, float]
+RAW_TYPE = Union[bytes, int, float]
 
 
 class Descriptor:
@@ -58,9 +61,9 @@ class Table:
                 meow = column_descriptors.find(b'\0', i)
                 nyaa = column_descriptors[i:meow].decode("UTF-8")
                 mjau = int.from_bytes(column_descriptors[meow + 1:meow + 3], byteorder=BYTEORDER)
-                if mjau == INT_TY:
+                if mjau == INT:
                     purr = IntegerTy()
-                elif mjau == FLOAT_TY:
+                elif mjau == FLOAT:
                     purr = FloatTy()
                 else:
                     purr = VarCharTy(mjau)
@@ -209,12 +212,17 @@ class Table:
         return int.from_bytes(block.data[pointer_index * POINTER_SIZE:(1 + pointer_index) * POINTER_SIZE],
                               byteorder=BYTEORDER)
 
-    def _increment_record_counter(self):
+    def _increment_record_counter(self) -> int:
+        """
+        :return: old record counter
+        """
         descriptor = self._decode_descriptor()
+        rc = descriptor.records
         descriptor.records += 1
         self._encode_descriptor(descriptor)
+        return rc
 
-    def _get_data_block_with_record(self, record_num: int) -> Block:
+    def _get_data_block_with_record(self, record_num: int) -> bytes:
         # sys.stderr.write(">{}\n".format(record_num))
         record_offset = self._calculate_record_size() * record_num
         page_num = record_offset // BLOCK_SIZE
@@ -229,11 +237,16 @@ class Table:
         if len(data) > BLOCK_SIZE:
             self.connection.write_block(self._get_data_pointer(base_page_num + 1), Block(data[BLOCK_SIZE:]))
 
-    def insert(self, values: Dict[Identifier, Literal], record_num=-1):
-        self._validate_insert_values(values)
-        if record_num == -1:
-            record_num = self.count_records()
-            self._increment_record_counter()
+    def insert(self, values: Tuple[DB_TYPE, ...], record_num: int = -1) -> Result[int, str]:
+        """
+        :return: Ok(record id) or Err(error description)
+        """
+        res = self._validate_insert_values(values)
+        if not res: return Err(res.err())
+        if record_num > self.count_records():
+            return Err('record_num({}) > #records({})'.format(record_num, self.count_records()))
+        if record_num == -1: record_num = self._increment_record_counter()
+
         record_offset = record_num * self._calculate_record_size()
         data_block = self._get_data_block_with_record(record_num)
         page_offset = record_offset % BLOCK_SIZE
@@ -242,94 +255,107 @@ class Table:
         data_block = data_block[0: page_offset] + record + data_block[page_offset + self._calculate_record_size():]
         self._set_data_with_record(page_num, data_block)
 
-    def select(self, record_num: int) -> List[Union[str, int, float]]:
-        assert record_num < self.count_records(), \
-            "Record num is bigger than number of records in the table: {}, {}" \
-                .format(record_num, self.count_records())
+        return Ok(record_num)
+
+    def select(self, record_num: int) -> Result[Tuple[DB_TYPE, ...], str]:
+        if record_num >= self.count_records():
+            return Err('record_num({}) >= #records({})'.format(record_num, self.count_records()))
+
         data_block = self._get_data_block_with_record(record_num)
-        decoded = self._decode_record(data_block, (record_num * self._calculate_record_size()) % BLOCK_SIZE)
-        fixed = list()
-        for i in range(0, len(self.get_columns())):
-            if type(decoded[i]) == bytes:
-                fixed.append(decoded[i].split(b'\0')[0].decode("UTF-8"))
+
+        res = self._decode_record(data_block, (record_num * self._calculate_record_size()) % BLOCK_SIZE)
+        if not res: return Err(res.err())
+        decoded = res.ok()
+
+        row: List[DB_TYPE] = list()
+        for i in range(len(self.get_columns())):
+            if isinstance(decoded[i], bytes):
+                try:
+                    row.append(decoded[i].split(b'\0')[0].decode("UTF-8"))
+                except UnicodeDecodeError as e:
+                    return Err(str(e))
             else:
-                fixed.append(decoded[i])
-        return fixed
+                row.append(decoded[i])
+        return Ok(row)
 
-    def select_all(self) -> List[List[Union[str, int, float]]]:
-        result = []
-        for i in range(0, self.count_records()):
-            result.append(self.select(i))
-        return result
+    def delete(self, record_num: int) -> Result[None, str]:
+        if record_num >= self.count_records():
+            return Err('record_num({}) >= #records({})'.format(record_num, self.count_records()))
 
-    def delete(self, record_num: int):
-        assert record_num < self.count_records(), \
-            "Record num is bigger than number of records in the table: {}, {}" \
-                .format(record_num, self.count_records())
         record_offset = record_num * self._calculate_record_size()
         data_block = self._get_data_block_with_record(record_num)
         data_block = data_block[0:record_offset % BLOCK_SIZE] + b'd' + data_block[record_offset % BLOCK_SIZE + 1:]
         self._set_data_with_record(record_offset // BLOCK_SIZE, data_block)
+        return Ok(None)
 
-    def update(self, index: int, values: Dict[Identifier, Literal]):
+    def update(self, index: int, values: Tuple[DB_TYPE, ...]) -> None:
         self.insert(values, index)
 
-    def drop(self):
+    def drop(self) -> None:
         self._encode_descriptor(Descriptor.empty())
 
-    def _validate_insert_values(self, values: Dict[Identifier, Literal]):
+    def _validate_insert_values(self, values: Tuple[DB_TYPE, ...]) -> Result[None, str]:
         """
         ensure all columns of this table are present
         """
-        assert values.keys() == {column.name for column in self.get_columns()}
+        columns = self.get_columns()
+
+        if len(values) != len(columns):
+            return IErr(f'number of values ({len(values)} != number of columns ({len(columns)})')
+
+        for i, (column, value) in enumerate(zip(columns, values)):
+            # @formatter:off
+            if --isinstance(column.ty, IntegerTy): ty = int
+            elif isinstance(column.ty, FloatTy):   ty = float
+            elif isinstance(column.ty, VarCharTy): ty = str
+            else: raise NotImplementedError
+            # @formatter:on
+            if not isinstance(value, ty):
+                return IErr(f'value #{i} has type {type(value).__name__}, expected: {ty.__name__}')
+
+        return IOk(None)
 
     def _calculate_record_size(self) -> int:
-        # s = 1
-        # for column in self.get_columns():
-        #     if isinstance(column.ty, IntegerTy):
-        #         s += 4
-        #     elif isinstance(column.ty, FloatTy):
-        #         s += 4
-        #     elif isinstance(column.ty, VarCharTy):
-        #         s += column.ty.width
-        #     else:
-        #         raise NotImplementedError
         return struct.calcsize(self._make_struct_format_string())
 
-    def _make_struct_format_string(self):
+    def _make_struct_format_string(self) -> str:
         res = 'c'
         for column in self.get_columns():
-            if isinstance(column.ty, IntegerTy):
-                res += 'i'
-            elif isinstance(column.ty, FloatTy):
-                res += 'f'
-            elif isinstance(column.ty, VarCharTy):
-                res += str(column.ty.width) + 's'
+            # @formatter:off
+            if --isinstance(column.ty, IntegerTy): res += 'i'
+            elif isinstance(column.ty, FloatTy):   res += 'f'
+            elif isinstance(column.ty, VarCharTy): res += str(column.ty.width) + 's'
+            # @formatter:on
         return res
 
-    def _decode_record(self, data_block, page_offset):
-        result = struct.unpack(self._make_struct_format_string(),
-                               data_block[page_offset: page_offset + self._calculate_record_size()])
-        if result[0] == b'd':
-            raise AttributeError("Record is dead")
-        elif result[0] == b'a':
-            return result[1:]
-        else:
-            raise RuntimeError("Incorrect record({}): {}".format(page_offset, result))
+    def _decode_record(self, data_block, page_offset) -> Result[tuple, str]:
+        try:
+            res = struct.unpack(self._make_struct_format_string(),
+                                data_block[page_offset: page_offset + self._calculate_record_size()])
+        except struct.error as e:
+            return Err(str(e))
+
+        if res[0] == b'd': return Err('Record is dead')
+        if res[0] != b'a': return Err('Incorrect record({}): {}'.format(page_offset, res))
+
+        data = res[1:]
+        if len(data) != len(self.get_columns()):
+            return Err('record({}) != #columns({})'.format(len(data), len(self.get_columns())))
+        return Ok(res[1:])
 
     def get_column_by_name(self, name: Identifier) -> ColumnDef:
         for column in self.get_columns():
             if column.name == name:
                 return column
 
-    def _encode_record(self, values: Dict[Identifier, Literal]):
+    def _encode_record(self, values: Tuple[DB_TYPE, ...]):
         """
         assume that value types correspond to column types.
         """
-        t = [b'a']  # alive FIXME
-        for k, v in values.items():
-            if isinstance(v, VarChar):
-                t.append(v.value.encode("UTF-8"))
+        t: List[RAW_TYPE] = [b'a']  # alive FIXME
+        for v in values:
+            if isinstance(v, str):
+                t.append(v.encode("UTF-8"))
             else:
-                t.append(v.value)
+                t.append(v)
         return struct.pack(self._make_struct_format_string(), *t)

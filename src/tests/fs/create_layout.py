@@ -4,7 +4,6 @@ from unittest import TestCase
 from dropSQL.ast import ColumnDef, IntegerTy, VarCharTy
 from dropSQL.fs.db_file import DBFile
 from dropSQL.parser.tokens.identifier import Identifier
-from dropSQL.parser.tokens.literal import Integer, VarChar
 
 
 class LayoutCase(TestCase):
@@ -29,24 +28,18 @@ class LayoutCase(TestCase):
             table.add_column(ColumnDef(Identifier("text"), VarCharTy(15)))
             for i in range(0, 10 ** 4):
                 # sys.stderr.write("Inserting record {} into {}\n".format(i, index))
-                table.insert({Identifier("ind") : Integer(i),
-                              Identifier("text"): VarChar("qwerty123456")})
-                if i % 3 == 0:
-                    table.delete(i)
-                if i % 3 == 1:
-                    table.update(i, {Identifier("ind") : Integer(-i),
-                                     Identifier("text"): VarChar("123456qwerty")})
-                try:
-                    values = table.select(i)
-                    self.assertEqual(abs(values[0]), i,
-                                     msg="received({}): {}".format(i, values[0]))
-                    self.assertIn(values[1], ("qwerty123456", "123456qwerty"),
-                                  msg="received({}): {}".format(i, values[1]))
-                except AttributeError:
-                    # sys.stderr.write("Record {} is dead\n".format(i))
-                    # record deleted
-                    # shitty code ♥
-                    pass
+                table.insert((i, "qwerty123456"))
+                if i % 3 == 0: table.delete(i)
+                if i % 3 == 1: table.update(i, (-i, "123456qwerty"))
+
+                res = table.select(i)
+                if not res: continue
+                values = res.ok()
+
+                self.assertEqual(abs(values[0]), i,
+                                 msg="received({}): {}".format(i, values[0]))
+                self.assertIn(values[1], ("qwerty123456", "123456qwerty"),
+                              msg="received({}): {}".format(i, values[1]))
             sys.stderr.write('Record count: {}\n'.format(table.count_records()))
             sys.stderr.write('{}\n'.format(str(table.get_columns())))
 
