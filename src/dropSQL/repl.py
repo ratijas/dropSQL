@@ -62,7 +62,6 @@ class Repl:
 
             if stmts.is_ok():
                 for stmt in stmts.ok():
-                    print('parsed statement:', stmt.to_sql())
                     res = self.conn.execute_statement(stmt, [])
                     if not res:
                         print(res)
@@ -119,6 +118,13 @@ class DotCommand:
 HELP = """
 This is dropSQL REPL. You are connected to {conn}.
 Type in commands and watch the output.
+
+.tables     Show all tables in the database.
+
+/create table t(a integer, b float, c varchar(42)) /drop
+/drop table if exists t /drop
+/insert into t (a, c, b) values (13.37, 42, 'morty'), (.0, 0, '') /drop
+/select *, a, 2 * b, c /as d from t Alias /where (c > 100) /and (f /= '') /drop
 """
 
 
