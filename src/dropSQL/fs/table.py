@@ -288,8 +288,8 @@ class Table:
         self._set_data_with_record(record_offset // BLOCK_SIZE, data_block)
         return Ok(None)
 
-    def update(self, index: int, values: Tuple[DB_TYPE, ...]) -> None:
-        self.insert(values, index)
+    def update(self, index: int, values: Tuple[DB_TYPE, ...]) -> Result[int, str]:
+        return self.insert(values, index)
 
     def drop(self) -> None:
         self._encode_descriptor(Descriptor.empty())
