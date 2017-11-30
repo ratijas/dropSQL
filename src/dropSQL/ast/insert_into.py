@@ -1,11 +1,16 @@
 from typing import *
 
+from dropSQL.engine.context import Context
+from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
 from .ast import AstStmt, FromSQL
-from .expression import Expression
 from .comma_separated import CommaSeparated
+from .expression import Expression
+
+if TYPE_CHECKING:
+    from dropSQL import fs
 
 ValueType = List[Expression]
 ValuesType = List[ValueType]
@@ -89,8 +94,57 @@ class InsertInto(AstStmt, FromSQL['InsertInto']):
 
         return IOk(InsertInto(table, columns, values))
 
-    def execute(self, db, args: List[Any] = ()) -> Result[None, None]:
-        raise NotImplementedError
+    def execute(self, db: 'fs.DBFile', args: ARGS_TYPE = ()) -> Result[None, str]:
+        # 1. find table by name
+        # 2. reorder columns in query according to table
+        # 3. underlying insert
+        table = db.get_table_by_name(self.table)
+        if table is None: return Err(f'Table {self.table} not found')
+
+        res = self.transition_vector(table)
+        if not res: return Err(res.err())
+        transition = res.ok()
+
+        ctx = Context.empty()
+        ctx.args = args
+
+        for value in self.values:
+            if len(value) != len(self.columns): return Err('#values != number of columns')
+
+            row: ROW_TYPE = [None] * len(self.columns)
+            for i, expr in enumerate(value):
+
+                res = expr.eval_with(ctx)
+                if not res: return Err(res.err())
+                item = res.ok()
+
+                row[transition[i]] = item
+
+            res = table.insert(row)
+            if not res: return Err(res.err())
+
+        return Ok(None)
+
+    def transition_vector(self, table: 'fs.Table') -> Result[List[int], str]:
+        table_columns = table.get_columns()
+
+        added: Set[Identifier] = set()
+        transitions: List[int] = []
+
+        for i, column in enumerate(self.columns):
+            if column in added: return Err(f'Column {column} duplicate')
+
+            for j, t_column in enumerate(table_columns):
+                if column == t_column.name:
+                    added.add(column)
+                    transitions.append(j)
+                    break
+
+            else:
+                return Err(f'Column {column} does not exist in table')
+
+        assert len(transitions) == len(self.columns)
+        return Ok(transitions)
 
 
 class IdentFromSQL(FromSQL[Identifier]):

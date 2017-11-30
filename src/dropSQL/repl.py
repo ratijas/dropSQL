@@ -3,6 +3,7 @@ import readline
 import sys
 
 from dropSQL import __version__
+from dropSQL.engine.row_set.row_set import RowSet
 from dropSQL.fs import Connection
 from dropSQL.parser.streams.statements import Statements
 
@@ -63,13 +64,22 @@ class Repl:
                 for stmt in stmts.ok():
                     print('parsed statement:', stmt.to_sql())
                     res = self.conn.execute_statement(stmt, [])
-                    print(res)
+                    if not res:
+                        print(res)
+                        continue
 
-                    # stmt = self.conn.prepare_statement('select * from file where name = ?1').ok()
-                    # cursor = stmt.execute(self.conn, ['readme.md'])
-                    # for row in cursor:
-                    #     print(row)
-                    # only one statement
+                    r = res.ok()
+                    if isinstance(r, RowSet):
+                        print(', '.join(str(col.name) for col in r.columns()))
+                        for row in enumerate(r.iter()):
+                            print(row)
+                    else:
+                        print(r)
+                        # stmt = self.conn.prepare_statement('select * from file where name = ?1').ok()
+                        # cursor = stmt.execute(self.conn, ['readme.md'])
+                        # for row in cursor:
+                        #     print(row)
+                        # only one statement
 
                 self.reset()
 

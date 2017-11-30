@@ -3,6 +3,7 @@ from typing import *
 
 from dropSQL.ast.column_def import ColumnDef
 from dropSQL.ast.ty import *
+from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.tokens import Identifier
 from .block import Block, BLOCK_SIZE, POINTER_SIZE
@@ -11,7 +12,6 @@ from .block_storage import BlockStorage
 BYTEORDER = 'big'
 INT = 0
 FLOAT = 0xffff
-DB_TYPE = Union[str, int, float]
 RAW_TYPE = Union[bytes, int, float]
 
 
@@ -237,7 +237,7 @@ class Table:
         if len(data) > BLOCK_SIZE:
             self.connection.write_block(self._get_data_pointer(base_page_num + 1), Block(data[BLOCK_SIZE:]))
 
-    def insert(self, values: Tuple[DB_TYPE, ...], record_num: int = -1) -> Result[int, str]:
+    def insert(self, values: ROW_TYPE, record_num: int = -1) -> Result[int, str]:
         """
         :return: Ok(record id) or Err(error description)
         """
@@ -257,7 +257,7 @@ class Table:
 
         return Ok(record_num)
 
-    def select(self, record_num: int) -> Result[Tuple[DB_TYPE, ...], str]:
+    def select(self, record_num: int) -> Result[ROW_TYPE, str]:
         if record_num >= self.count_records():
             return Err('record_num({}) >= #records({})'.format(record_num, self.count_records()))
 
@@ -267,7 +267,7 @@ class Table:
         if not res: return Err(res.err())
         decoded = res.ok()
 
-        row: List[DB_TYPE] = list()
+        row: ROW_TYPE = list()
         for i in range(len(self.get_columns())):
             if isinstance(decoded[i], bytes):
                 try:
@@ -276,6 +276,7 @@ class Table:
                     return Err(str(e))
             else:
                 row.append(decoded[i])
+
         return Ok(row)
 
     def delete(self, record_num: int) -> Result[None, str]:
@@ -288,13 +289,13 @@ class Table:
         self._set_data_with_record(record_offset // BLOCK_SIZE, data_block)
         return Ok(None)
 
-    def update(self, index: int, values: Tuple[DB_TYPE, ...]) -> Result[int, str]:
+    def update(self, index: int, values: ROW_TYPE) -> Result[int, str]:
         return self.insert(values, index)
 
     def drop(self) -> None:
         self._encode_descriptor(Descriptor.empty())
 
-    def _validate_insert_values(self, values: Tuple[DB_TYPE, ...]) -> Result[None, str]:
+    def _validate_insert_values(self, values: ROW_TYPE) -> Result[None, str]:
         """
         ensure all columns of this table are present
         """
@@ -305,12 +306,14 @@ class Table:
 
         for i, (column, value) in enumerate(zip(columns, values)):
             # @formatter:off
+            # TODO: Ty::primitive -> Type[Union[int, float, str]]
             if --isinstance(column.ty, IntegerTy): ty = int
             elif isinstance(column.ty, FloatTy):   ty = float
             elif isinstance(column.ty, VarCharTy): ty = str
             else: raise NotImplementedError
             # @formatter:on
             if not isinstance(value, ty):
+                print('A' * 100)
                 return IErr(f'value #{i} has type {type(value).__name__}, expected: {ty.__name__}')
 
         return IOk(None)
@@ -348,7 +351,7 @@ class Table:
             if column.name == name:
                 return column
 
-    def _encode_record(self, values: Tuple[DB_TYPE, ...]):
+    def _encode_record(self, values: ROW_TYPE):
         """
         assume that value types correspond to column types.
         """

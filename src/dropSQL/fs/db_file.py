@@ -6,6 +6,7 @@ import io
 import os
 from typing import *
 
+from dropSQL.parser.tokens import Identifier
 from .block import Block, BLOCK_SIZE
 from .block_storage import BlockStorage
 from .metadata import Metadata
@@ -49,6 +50,12 @@ class DBFile(BlockStorage):
             self.tables = [Table(self, i) for i in range(0, 16)]
 
         return self.tables
+
+    def get_table_by_name(self, name: Identifier) -> Optional[Table]:
+        for table in self.get_tables():
+            if table.get_table_name() == name: return table
+        else:
+            return None
 
     def read_block(self, block_num) -> Block:
         self.file.seek(BLOCK_SIZE * block_num)

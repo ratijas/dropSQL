@@ -26,11 +26,11 @@ class LayoutCase(TestCase):
 
             table.add_column(ColumnDef(Identifier("ind"), IntegerTy()))
             table.add_column(ColumnDef(Identifier("text"), VarCharTy(15)))
-            for i in range(0, 10 ** 4):
+            for i in range(0, 10 ** 3):
                 # sys.stderr.write("Inserting record {} into {}\n".format(i, index))
-                table.insert((i, "qwerty123456")).ok()
+                table.insert([i, "qwerty123456"]).ok()
                 if i % 3 == 0: table.delete(i).ok()
-                if i % 3 == 1: table.update(i, (-i, "123456qwerty")).ok()
+                if i % 3 == 1: table.update(i, [-i, "123456qwerty"]).ok()
 
                 res = table.select(i)
                 if not res: continue

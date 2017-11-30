@@ -1,5 +1,6 @@
 from typing import *
 
+from dropSQL.engine.row_set.table import TableRowSet
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
@@ -10,6 +11,10 @@ from .expression import Expression
 from .join import JoinAst
 from .result_column import ResultColumn
 from .where import WhereFromSQL
+
+if TYPE_CHECKING:
+    from dropSQL.engine.row_set.row_set import RowSet
+    from dropSQL import fs
 
 
 class SelectFrom(AstStmt):
@@ -79,5 +84,10 @@ class SelectFrom(AstStmt):
 
         return IOk(SelectFrom(columns, table, where=where))
 
-    def execute(self, db, args: List[Any] = ()) -> Result[None, None]:
-        raise NotImplementedError
+    def execute(self, db: 'fs.DBFile', args: List[Any] = ()) -> Result['RowSet', str]:
+
+        table = db.get_table_by_name(self.table.name)
+        if table is None: return Err(f'Table {self.table.name} not found')
+
+        rs = TableRowSet(table)
+        return Ok(rs)
