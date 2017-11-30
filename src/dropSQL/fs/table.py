@@ -264,6 +264,13 @@ class Table:
     def update(self, index: int, values: Dict[Identifier, Literal]):
         self.insert(values, index)
 
+    def drop(self):
+        desc = self._decode_descriptor()
+        desc["pointers"] = [0]*13
+        desc["table_name"] = ""
+        desc["columns"] = []
+        self._encode_descriptor(desc)
+
     def _validate_insert_values(self, values: Dict[Identifier, Literal]):
         """
         ensure all columns of this table are present
