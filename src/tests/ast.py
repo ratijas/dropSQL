@@ -27,7 +27,7 @@ class AstTestCase(TestCase):
 
     def test_aliased(self):
         self.assertEqual('person', AliasedTable(Identifier('person')).to_sql())
-        self.assertEqual('person /as p', AliasedTable(Identifier('person'), Identifier('p')).to_sql())
+        self.assertEqual('person p', AliasedTable(Identifier('person'), Identifier('p')).to_sql())
         self.assertEqual('height / 3 /as /h3',
                          AliasedExpression(
                              ExpressionBinary(
@@ -135,7 +135,7 @@ class AstTestCase(TestCase):
                          .to_sql())
 
     def test_select_from(self):
-        self.assertEqual('/select P/name /as first_name, * /from person /as P /drop',
+        self.assertEqual('/select P/name /as first_name, * /from person P /drop',
                          SelectFrom(
                              columns=[
                                  ResultExpression(
@@ -150,7 +150,7 @@ class AstTestCase(TestCase):
                          .to_sql())
 
         self.assertEqual(
-            '/select * /from person /as P, department /as D /join manager /as M /on M/department_id = D/id /drop',
+            '/select * /from person P, department D /join manager M /on M/department_id = D/id /drop',
             SelectFrom(
                 columns=[ResultStar()],
                 table=AliasedTable(Identifier('person'), Identifier('P')),
@@ -163,7 +163,7 @@ class AstTestCase(TestCase):
                                   ExpressionReference(Identifier('D'), Identifier('id', True)))),
                 ]).to_sql())
 
-        self.assertEqual('/select * /from person /as P /where P/age >= 18 /drop',
+        self.assertEqual('/select * /from person P /where P/age >= 18 /drop',
                          SelectFrom(
                              columns=[ResultStar()],
                              table=AliasedTable(Identifier('person'), Identifier('P')),
