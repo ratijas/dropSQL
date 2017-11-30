@@ -49,7 +49,7 @@ class UpdateSet(AstStmt):
             : "/update" /table_name "set" /assignments /where_clause /drop
             ;
         """
-        # next item must be the '/create' token
+        # next item must be the '/update' token
         t = tokens.next().and_then(Cast(Update))
         if not t: return IErr(t.err())
 

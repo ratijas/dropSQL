@@ -34,7 +34,7 @@ class DeleteFrom(AstStmt):
             : "/delete" "from" /table_name /where_clause /drop
             ;
         """
-        # next item must be the "/insert" token
+        # next item must be the "/delete" token
         t = tokens.next().and_then(Cast(Delete))
         if not t: return IErr(t.err())
 
