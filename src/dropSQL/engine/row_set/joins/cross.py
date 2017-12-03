@@ -2,9 +2,7 @@ from typing import *
 
 from ..row_set import RowSet
 from ...column import Column
-
-if TYPE_CHECKING:
-    from ...row import Row
+from ...row import Row
 
 
 class CrossJoinRowSet(RowSet):

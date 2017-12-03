@@ -1,12 +1,19 @@
 import abc
 from typing import *
 
+from dropSQL.engine.row_set.joins.cross import CrossJoinRowSet
+from dropSQL.engine.row_set.joins.left_inner import LeftInnerJoinRowSet
+from dropSQL.engine.row_set.row_set import RowSet
+from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
 from .alias import AliasedTable
 from .ast import *
 from .expression import Expression
+
+if TYPE_CHECKING:
+    from dropSQL import fs
 
 __all__ = [
     'JoinClausesParser',
@@ -47,6 +54,12 @@ class JoinAst(Ast, FromSQL['JoinAst'], metaclass=abc.ABCMeta):
 
         self.table = table
 
+    @abc.abstractmethod
+    def join(self, lhs: RowSet, db: 'fs.DBFile', args: ARGS_TYPE = ()) -> Result[RowSet, str]:
+        """
+        Join `lhs` on the left with self on the right.
+        """
+
     @classmethod
     def from_sql(cls, tokens: Stream[Token]) -> IResult['JoinAst']:
         """
@@ -72,6 +85,14 @@ class CrossJoin(JoinAst, FromSQL['CrossJoin']):
     def __init__(self, table: AliasedTable) -> None:
         super().__init__(table)
 
+    def join(self, lhs: RowSet, db: 'fs.DBFile', args: ARGS_TYPE = ()) -> Result[RowSet, str]:
+        rhs = self.table.row_set(db)
+        if not rhs: return Err(rhs.err())
+
+        rs = CrossJoinRowSet(lhs, rhs.ok())
+
+        return Ok(rs)
+
     def to_sql(self) -> str:
         join = ', '
         join += self.table.to_sql()
@@ -95,11 +116,18 @@ class CrossJoin(JoinAst, FromSQL['CrossJoin']):
         return IOk(CrossJoin(table))
 
 
-class LeftInnerJoin(JoinAst, FromSQL['LeftInnerJoin']):
-    def __init__(self, table: AliasedTable, constraint: Optional[Expression] = None) -> None:
+class LeftInnerJoin(CrossJoin, FromSQL['LeftInnerJoin']):
+    def __init__(self, table: AliasedTable, constraint: Expression) -> None:
         super().__init__(table)
 
         self.constraint = constraint
+
+    def join(self, lhs: RowSet, db: 'fs.DBFile', args: ARGS_TYPE = ()) -> Result[RowSet, str]:
+        r = self.table.row_set(db)
+        if not r: return Err(r.err())
+        rhs = r.ok()
+
+        return Ok(LeftInnerJoinRowSet(lhs, rhs, self.constraint, args))
 
     def to_sql(self) -> str:
         join = ' /join '

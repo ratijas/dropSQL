@@ -1,12 +1,18 @@
 import abc
 from typing import *
 
+from dropSQL.engine.row_set.rename_table import RenameTableRowSet
+from dropSQL.engine.row_set.row_set import RowSet
+from dropSQL.engine.row_set.table import TableRowSet
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
 from .ast import Ast
 from .expression import Expression
 from .identifier import Identifier
+
+if TYPE_CHECKING:
+    from dropSQL import fs
 
 
 class Alias(Ast, metaclass=abc.ABCMeta):
@@ -21,6 +27,17 @@ class AliasedTable(Alias):
         super().__init__(alias)
 
         self.name = name
+
+    def row_set(self, db: 'fs.DBFile') -> Result[RowSet, str]:
+        table = db.get_table_by_name(self.name)
+        if table is None: return Err(f'Table {self.name} not found')
+
+        rs = TableRowSet(table)
+
+        if self.alias is not None:
+            rs = RenameTableRowSet(rs, self.alias)
+
+        return Ok(rs)
 
     def to_sql(self) -> str:
         s = str(self.name)

@@ -2,8 +2,6 @@ from typing import *
 
 from dropSQL.engine.row_set.filtered import FilteredRowSet
 from dropSQL.engine.row_set.projection import ProjectionRowSet
-from dropSQL.engine.row_set.rename_table import RenameTableRowSet
-from dropSQL.engine.row_set.table import TableRowSet
 from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
@@ -91,14 +89,14 @@ class SelectFrom(AstStmt):
         return IOk(SelectFrom(columns, table, joins, where))
 
     def execute(self, db: 'fs.DBFile', args: ARGS_TYPE = ()) -> Result['RowSet', str]:
+        r = self.table.row_set(db)
+        if not r: return Err(r.err())
+        rs = r.ok()
 
-        table = db.get_table_by_name(self.table.name)
-        if table is None: return Err(f'Table {self.table.name} not found')
-
-        rs = TableRowSet(table)
-
-        if self.table.alias is not None:
-            rs = RenameTableRowSet(rs, self.table.alias)
+        for join in self.joins:
+            r = join.join(rs, db, args)
+            if not r: return Err(r.err())
+            rs = r.ok()
 
         if self.where is not None:
             rs = FilteredRowSet(rs, self.where, args)
