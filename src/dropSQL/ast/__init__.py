@@ -9,7 +9,7 @@ from .existence import IfExists, IfNotExists
 from .expression import *
 from .identifier import *
 from .insert_into import InsertInto
-from .join import JoinAst, CrossJoin, InnerJoin
+from .join import *
 from .result_column import ResultColumn, ResultStar, ResultExpression
 from .select_from import SelectFrom
 from .ty import *

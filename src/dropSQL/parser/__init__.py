@@ -53,31 +53,29 @@
     ;
 
 /from_body
-    : /aliased_table /join_clause
+    : /aliased_table /join_clauses
     ;
 
 /aliased_table
     : /table_name /alias
     ;
 
+/join_clauses
+    : /* empty */
+    | /join_clauses /join_clause
+    ;
+
 /join_clause
-    : /* empty */
-    | /join_clause /join_rhs
+    : /cross_join
+    | /left_inner_join
     ;
 
-
-/join_rhs
-    : /join_operator /aliased_table /join_constraint
+/cross_join
+    : "," /aliased_table
     ;
 
-/join_operator
-    : ","
-    | "/join"
-    ;
-
-/join_constraint
-    : /* empty */
-    | "/on" expr
+/left_inner_join
+    : "/join" /aliased_table "/on" expr
     ;
 
 existence

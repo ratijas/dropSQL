@@ -5,6 +5,8 @@ from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
 
+__all__ = ['Ast', 'AstStmt', 'FromSQL']
+
 
 class Ast(metaclass=abc.ABCMeta):
     @abc.abstractmethod

@@ -12,7 +12,7 @@ from .alias import AliasedTable
 from .ast import AstStmt
 from .comma_separated import CommaSeparated
 from .expression import Expression
-from .join import JoinAst
+from .join import *
 from .result_column import ResultColumn
 from .where import WhereFromSQL
 
@@ -77,7 +77,9 @@ class SelectFrom(AstStmt):
         if not t: return IErr(t.err().empty_to_incomplete())
         table = t.ok()
 
-        # TODO: joins
+        t = JoinClausesParser.from_sql(tokens)
+        if not t: return IErr(t.err().empty_to_incomplete())
+        joins = t.ok()
 
         t = WhereFromSQL.from_sql(tokens)
         if not t: return IErr(t.err().empty_to_incomplete())
@@ -86,7 +88,7 @@ class SelectFrom(AstStmt):
         t = tokens.next().and_then(Cast(Drop))
         if not t: return IErr(t.err().empty_to_incomplete())
 
-        return IOk(SelectFrom(columns, table, where=where))
+        return IOk(SelectFrom(columns, table, joins, where))
 
     def execute(self, db: 'fs.DBFile', args: ARGS_TYPE = ()) -> Result['RowSet', str]:
 
