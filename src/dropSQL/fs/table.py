@@ -30,7 +30,7 @@ class Descriptor:
 
 
 class Table:
-    def __init__(self, connection: BlockStorage, index: int):
+    def __init__(self, connection: BlockStorage, index: int) -> None:
         self.connection = connection
         self.index = index
         self.cached_descriptor: Optional[Descriptor] = None
