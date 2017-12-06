@@ -1,6 +1,7 @@
 from typing import *
 
 from dropSQL.engine.row_set import *
+from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
@@ -58,8 +59,8 @@ class DeleteFrom(AstStmt):
 
         return IOk(DeleteFrom(table, where))
 
-    def execute(self, db: 'fs.DBFile', args: List[Any] = ()) -> Result[int, str]:
-        if self.table == Identifier('autism'): return Err('can not operate on master table')
+    def execute(self, db: 'fs.DBFile', args: ARGS_TYPE = ()) -> Result[int, str]:
+        if self.table == Identifier('autism'): return Err('Can not operate on master table')
 
         t = db.get_table_by_name(self.table)
         if not t: return Err(t.err())
