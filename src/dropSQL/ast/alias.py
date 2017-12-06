@@ -3,7 +3,6 @@ from typing import *
 
 from dropSQL.engine.row_set.rename_table import RenameTableRowSet
 from dropSQL.engine.row_set.row_set import RowSet
-from dropSQL.engine.row_set.table import TableRowSet
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
@@ -29,10 +28,8 @@ class AliasedTable(Alias):
         self.name = name
 
     def row_set(self, db: 'fs.DBFile') -> Result[RowSet, str]:
-        table = db.get_table_by_name(self.name)
-        if table is None: return Err(f'Table {self.name} not found')
-
-        rs = TableRowSet(table)
+        rs = db.get_row_set(self.name)
+        if rs is None: return Err(f'Table {self.name} not found')
 
         if self.alias is not None:
             rs = RenameTableRowSet(rs, self.alias)

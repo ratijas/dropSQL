@@ -6,6 +6,11 @@ import io
 import os
 from typing import *
 
+from dropSQL.ast import *
+from dropSQL.engine.column import Column
+from dropSQL.engine.row_set.mock import MockRowSet
+from dropSQL.engine.row_set.row_set import RowSet
+from dropSQL.engine.row_set.table import TableRowSet
 from dropSQL.parser.tokens import Identifier
 from .block import Block, BLOCK_SIZE
 from .block_storage import BlockStorage
@@ -60,6 +65,16 @@ class DBFile(BlockStorage):
         else:
             return None
 
+    def get_row_set(self, table_name: Identifier) -> Optional[RowSet]:
+        if table_name == Identifier('autism'):
+            return self.master_table()
+
+        else:
+            table = self.get_table_by_name(table_name)
+            if table is None: return None
+
+            return TableRowSet(table)
+
     def read_block(self, block_num) -> Block:
         self.file.seek(BLOCK_SIZE * block_num)
         try:
@@ -85,6 +100,20 @@ class DBFile(BlockStorage):
 
     def is_in_memory(self):
         return self.path == MEMORY
+
+    def master_table(self) -> RowSet:
+        autism = Identifier('autism', True)
+        columns = [
+            Column(autism, Identifier('type'), VarCharTy(16)),
+            Column(autism, Identifier('name'), VarCharTy(255)),
+            Column(autism, Identifier('sql'), VarCharTy(1024)),
+        ]
+        rows = []
+        for table in self.get_tables():
+            if table.get_table_name().identifier == '': continue
+            sql: str = ', '.join(column.to_sql() for column in table.get_columns())
+            rows.append(['table', table.get_table_name().identifier, sql])
+        return MockRowSet(columns, rows)
 
     def __str__(self) -> str:
         if self.is_in_memory():
