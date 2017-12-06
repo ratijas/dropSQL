@@ -6,6 +6,7 @@ from dropSQL import __version__
 from dropSQL.engine.row_set.row_set import RowSet
 from dropSQL.fs import Connection
 from dropSQL.parser.streams.statements import Statements
+from .formatters import PrettyFormatter
 
 
 def open_file_or_memory() -> Connection:
@@ -69,9 +70,9 @@ class Repl:
 
                     r = res.ok()
                     if isinstance(r, RowSet):
-                        print(', '.join(str(col.name) for col in r.columns()))
-                        for row in enumerate(r.iter()):
-                            print(row)
+                        fmt = PrettyFormatter.with_row_set(r)
+                        fmt.format(sys.stdout)
+
                     else:
                         print(r)
                         # stmt = self.conn.prepare_statement('select * from file where name = ?1').ok()
@@ -95,6 +96,9 @@ class Repl:
 
 
 def launch():
+    """
+    CLI launcher.
+    """
     conn = open_file_or_memory()
 
     print(f'/dropSQL version {__version__}\n'
@@ -119,6 +123,7 @@ HELP = """
 This is dropSQL REPL. You are connected to {conn}.
 Type in commands and watch the output.
 
+.help       Show this help.
 .tables     Show all tables in the database.
 
 /create table t(a integer, b float, c varchar(42)) /drop
@@ -142,8 +147,6 @@ class ListTables(DotCommand):
     @classmethod
     def execute(cls, conn: Connection) -> None:
         print('tables in the database:')
-        for i, table in enumerate(conn.file.get_tables()):
-            name = table.get_table_name()
-            columns = ", ".join(column.to_sql() for column in table.get_columns())
-            if name.identifier != '':
-                print(f'{i}. {name} ({columns})')
+        master_table = conn.file.master_table()
+        f = PrettyFormatter.with_row_set(master_table)
+        f.format(sys.stdout)
