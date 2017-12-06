@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-from setuptools import setup
-from os.path import join, dirname
 import sys
+from os.path import join, dirname
+from setuptools import setup, find_packages
 
 sys.path.append(join(dirname(__file__), 'src'))
 
@@ -16,7 +16,7 @@ setup(
     author='ratijas & ecat3',
     author_email='gmail@ratijas.tk',
     url='https://github.com/ratijas/dropSQL',
-    packages=['dropSQL'],
+    packages=find_packages('src', include=['dropSQL', 'dropSQL.*']),
     package_dir={'dropSQL': 'src/dropSQL'},
     entry_points={
         'console_scripts':
