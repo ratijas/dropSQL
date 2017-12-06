@@ -67,14 +67,14 @@
 
 /join_clause
     : /cross_join
-    | /left_inner_join
+    | /inner_join
     ;
 
 /cross_join
     : "," /aliased_table
     ;
 
-/left_inner_join
+/inner_join
     : "/join" /aliased_table "/on" expr
     ;
 

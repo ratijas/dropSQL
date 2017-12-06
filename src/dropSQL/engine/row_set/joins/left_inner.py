@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from dropSQL.ast.expression import Expression
 
 
-class LeftInnerJoinRowSet(RowSet):
+class InnerJoinRowSet(RowSet):
     def __init__(self, lhs: RowSet, rhs: RowSet, on: 'Expression', args: ARGS_TYPE) -> None:
         super().__init__()
 

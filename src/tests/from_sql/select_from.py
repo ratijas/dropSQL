@@ -34,7 +34,7 @@ class SelectFromTestCase(TestCase):
         self.assertTrue(t)
         joins = t.ok().joins
 
-        join_b: LeftInnerJoin = joins[0]
+        join_b: InnerJoin = joins[0]
         self.assertEqual(join_b.table.name, Identifier('b'))
         self.assertEqual(join_b.table.alias, Identifier('c'))
         self.assertEqual(join_b.constraint.to_sql(), 'a/name = c/id')

@@ -1,7 +1,7 @@
 from unittest import TestCase
 
-from dropSQL.parser.tokens import *
 from dropSQL.ast import *
+from dropSQL.parser.tokens import *
 
 
 class AstTestCase(TestCase):
@@ -156,8 +156,8 @@ class AstTestCase(TestCase):
                 table=AliasedTable(Identifier('person'), Identifier('P')),
                 joins=[
                     CrossJoin(AliasedTable(Identifier('department'), Identifier('D'))),
-                    LeftInnerJoin(AliasedTable(Identifier('manager'), Identifier('M')),
-                                  ExpressionBinary(
+                    InnerJoin(AliasedTable(Identifier('manager'), Identifier('M')),
+                              ExpressionBinary(
                                   Operator('='),
                                   ExpressionReference(Identifier('M'), Identifier('department_id', True)),
                                   ExpressionReference(Identifier('D'), Identifier('id', True)))),

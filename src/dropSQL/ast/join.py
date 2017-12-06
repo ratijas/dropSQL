@@ -2,7 +2,7 @@ import abc
 from typing import *
 
 from dropSQL.engine.row_set.joins.cross import CrossJoinRowSet
-from dropSQL.engine.row_set.joins.left_inner import LeftInnerJoinRowSet
+from dropSQL.engine.row_set.joins.left_inner import InnerJoinRowSet
 from dropSQL.engine.row_set.row_set import RowSet
 from dropSQL.engine.types import *
 from dropSQL.generic import *
@@ -19,7 +19,7 @@ __all__ = [
     'JoinClausesParser',
     'JoinAst',
     'CrossJoin',
-    'LeftInnerJoin',
+    'InnerJoin',
 ]
 
 
@@ -65,7 +65,7 @@ class JoinAst(Ast, FromSQL['JoinAst'], metaclass=abc.ABCMeta):
         """
         /join_clause
             : /cross_join
-            | /left_inner_join
+            | /inner_join
             ;
         """
         t = tokens.peek()
@@ -76,7 +76,7 @@ class JoinAst(Ast, FromSQL['JoinAst'], metaclass=abc.ABCMeta):
             return CrossJoin.from_sql(tokens)
 
         if isinstance(tok, Join):
-            return LeftInnerJoin.from_sql(tokens)
+            return InnerJoin.from_sql(tokens)
 
         return IErr(Empty())
 
@@ -116,7 +116,7 @@ class CrossJoin(JoinAst, FromSQL['CrossJoin']):
         return IOk(CrossJoin(table))
 
 
-class LeftInnerJoin(CrossJoin, FromSQL['LeftInnerJoin']):
+class InnerJoin(CrossJoin, FromSQL['InnerJoin']):
     def __init__(self, table: AliasedTable, constraint: Expression) -> None:
         super().__init__(table)
 
@@ -127,7 +127,7 @@ class LeftInnerJoin(CrossJoin, FromSQL['LeftInnerJoin']):
         if not r: return Err(r.err())
         rhs = r.ok()
 
-        return Ok(LeftInnerJoinRowSet(lhs, rhs, self.constraint, args))
+        return Ok(InnerJoinRowSet(lhs, rhs, self.constraint, args))
 
     def to_sql(self) -> str:
         join = ' /join '
@@ -140,9 +140,9 @@ class LeftInnerJoin(CrossJoin, FromSQL['LeftInnerJoin']):
         return join
 
     @classmethod
-    def from_sql(cls, tokens: Stream[Token]) -> IResult['LeftInnerJoin']:
+    def from_sql(cls, tokens: Stream[Token]) -> IResult['InnerJoin']:
         """
-        /left_inner_join
+        /inner_join
             : "/join" /aliased_table "/on" expr
             ;
         """
@@ -160,4 +160,4 @@ class LeftInnerJoin(CrossJoin, FromSQL['LeftInnerJoin']):
         if not t: return IErr(t.err().empty_to_incomplete())
         constraint = t.ok()
 
-        return IOk(LeftInnerJoin(table, constraint))
+        return IOk(InnerJoin(table, constraint))
