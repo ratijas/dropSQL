@@ -8,9 +8,7 @@ from typing import *
 
 from dropSQL.ast import *
 from dropSQL.engine.column import Column
-from dropSQL.engine.row_set.mock import MockRowSet
-from dropSQL.engine.row_set.row_set import RowSet
-from dropSQL.engine.row_set.table import TableRowSet
+from dropSQL.engine.row_set import *
 from dropSQL.generic import *
 from dropSQL.parser.tokens import Identifier
 from .block import Block, BLOCK_SIZE

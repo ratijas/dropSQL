@@ -1,9 +1,7 @@
 import abc
 from typing import *
 
-from dropSQL.engine.row_set.joins.cross import CrossJoinRowSet
-from dropSQL.engine.row_set.joins.left_inner import InnerJoinRowSet
-from dropSQL.engine.row_set.row_set import RowSet
+from dropSQL.engine.row_set import *
 from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.streams import *

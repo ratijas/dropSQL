@@ -1,11 +1,10 @@
 import collections.abc
 from typing import *
 
-from .row_set.empty import EmptyRowSet
 from .types import *
 
 if TYPE_CHECKING:
-    from .row_set.row_set import RowSet
+    from .row_set import RowSet
 
 
 class Row(collections.abc.Sequence):
@@ -18,6 +17,7 @@ class Row(collections.abc.Sequence):
 
     @classmethod
     def empty(cls) -> 'Row':
+        from .row_set import EmptyRowSet
         return Row(EmptyRowSet(), [])
 
     def __len__(self):

@@ -1,7 +1,5 @@
 from typing import *
 
-from dropSQL.ast.result_column import *
-from dropSQL.ast.ty import *
 from dropSQL.parser.tokens import Identifier
 from .row_set import RowSet
 from ..column import Column
@@ -10,24 +8,24 @@ from ..row import Row
 from ..types import *
 
 if TYPE_CHECKING:
-    pass
+    from dropSQL.ast.result_column import *
 
 
 class ProjectionRowSet(RowSet):
-    def __init__(self, inner: RowSet, columns: List[ResultColumn], args: ARGS_TYPE) -> None:
+    def __init__(self, inner: RowSet, columns: List['ResultColumn'], args: ARGS_TYPE) -> None:
         super().__init__()
 
         self.inner = inner
         self._columns: List[Column] = []
-        self.outputs: List[ResultColumn] = []
+        self.outputs: List['ResultColumn'] = []
 
         for column in columns:
-            if isinstance(column, ResultStar):
+            if column.is_star():
                 self._columns.extend(Column(Identifier(''), c.name, c.ty) for c in self.inner.columns())
                 self.outputs.append(column)
 
-            elif isinstance(column, ResultExpression):
-                aliased = column.expression
+            else:
+                aliased = column.as_expression().expression
 
                 if aliased.alias is not None:
                     alias = aliased.alias
@@ -35,6 +33,7 @@ class ProjectionRowSet(RowSet):
                     alias = aliased.expression.to_sql()
 
                 # TODO: Expression::derive_type(args) -> Result[Ty]
+                from dropSQL.ast.ty import IntegerTy
                 ty = IntegerTy()
                 self._columns.append(Column(Identifier(''), alias, ty))
                 self.outputs.append(column)
@@ -51,10 +50,11 @@ class ProjectionRowSet(RowSet):
             data: ROW_TYPE = []
 
             for out in self.outputs:
-                if isinstance(out, ResultStar):
+                if out.is_star():
                     data.extend(row.data)
-                elif isinstance(out, ResultExpression):
-                    expr = out.expression.expression
+
+                else:
+                    expr = out.as_expression().expression.expression
                     res = expr.eval_with(ctx)
                     if not res: raise ValueError(res.err())
                     data.append(res.ok())

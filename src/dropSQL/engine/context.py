@@ -7,6 +7,8 @@ class Context:
     Evaluation context for expressions.
     """
 
+    __slots__ = ['args', 'row']
+
     def __init__(self, row: Row, args: ARGS_TYPE) -> None:
         super().__init__()
 

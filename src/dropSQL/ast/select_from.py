@@ -1,7 +1,6 @@
 from typing import *
 
-from dropSQL.engine.row_set.filtered import FilteredRowSet
-from dropSQL.engine.row_set.projection import ProjectionRowSet
+from dropSQL.engine.row_set import *
 from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
@@ -15,7 +14,6 @@ from .result_column import ResultColumn
 from .where import WhereFromSQL
 
 if TYPE_CHECKING:
-    from dropSQL.engine.row_set.row_set import RowSet
     from dropSQL import fs
 
 

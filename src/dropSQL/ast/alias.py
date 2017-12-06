@@ -1,8 +1,7 @@
 import abc
 from typing import *
 
-from dropSQL.engine.row_set.rename_table import RenameTableRowSet
-from dropSQL.engine.row_set.row_set import RowSet
+from dropSQL.engine.row_set import *
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *

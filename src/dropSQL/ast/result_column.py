@@ -40,6 +40,19 @@ class ResultColumn(Ast, FromSQL['ResultColumn'], metaclass=abc.ABCMeta):
 
         return IOk(ResultExpression(t.ok()))
 
+    # for the sake of static typing
+    def is_star(self) -> bool:
+        raise NotImplementedError
+
+    def as_star(self) -> 'ResultStar':
+        raise NotImplementedError
+
+    def is_expression(self) -> bool:
+        raise NotImplementedError
+
+    def as_expression(self) -> 'ResultExpression':
+        raise NotImplementedError
+
 
 class ResultStar(ResultColumn):
     def __init__(self) -> None:
@@ -47,6 +60,15 @@ class ResultStar(ResultColumn):
 
     def to_sql(self) -> str:
         return '*'
+
+    def is_star(self) -> bool:
+        return True
+
+    def is_expression(self) -> bool:
+        return False
+
+    def as_star(self) -> 'ResultStar':
+        return self
 
 
 class ResultExpression(ResultColumn):
@@ -57,3 +79,12 @@ class ResultExpression(ResultColumn):
 
     def to_sql(self) -> str:
         return self.expression.to_sql()
+
+    def is_star(self) -> bool:
+        return False
+
+    def is_expression(self) -> bool:
+        return True
+
+    def as_expression(self) -> 'ResultExpression':
+        return self

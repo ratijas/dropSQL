@@ -1,7 +1,6 @@
 from typing import *
 
-from dropSQL.engine.row_set.filtered import FilteredRowSet
-from dropSQL.engine.row_set.table import TableRowSet
+from dropSQL.engine.row_set import *
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *

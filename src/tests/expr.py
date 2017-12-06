@@ -3,7 +3,7 @@ from unittest import TestCase
 from dropSQL.ast import *
 from dropSQL.engine.column import Column
 from dropSQL.engine.context import Context
-from dropSQL.engine.row_set.mock import MockRowSet
+from dropSQL.engine.row_set import *
 from dropSQL.parser.tokens import Operator
 
 

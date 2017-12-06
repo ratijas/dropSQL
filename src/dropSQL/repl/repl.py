@@ -3,7 +3,7 @@ import readline
 import sys
 
 from dropSQL import __version__
-from dropSQL.engine.row_set.row_set import RowSet
+from dropSQL.engine.row_set import *
 from dropSQL.fs import Connection
 from dropSQL.parser.streams.statements import Statements
 from .formatters import PrettyFormatter

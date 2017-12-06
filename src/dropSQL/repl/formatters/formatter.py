@@ -3,7 +3,7 @@ from typing import *
 from typing.io import TextIO
 
 
-from dropSQL.engine.row_set.row_set import RowSet
+from dropSQL.engine.row_set import *
 
 __all__ = ['Formatter']
 
