@@ -1,5 +1,7 @@
 from typing import *
 
+from dropSQL.engine.row_set.filtered import FilteredRowSet
+from dropSQL.engine.row_set.table import TableRowSet
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
@@ -7,6 +9,9 @@ from .ast import AstStmt
 from .expression import Expression
 from .identifier import Identifier
 from .where import WhereFromSQL
+
+if TYPE_CHECKING:
+    from dropSQL import fs
 
 
 class DeleteFrom(AstStmt):
@@ -54,5 +59,21 @@ class DeleteFrom(AstStmt):
 
         return IOk(DeleteFrom(table, where))
 
-    def execute(self, db, args: List[Any] = ()) -> Result[None, None]:
-        raise NotImplementedError
+    def execute(self, db: 'fs.DBFile', args: List[Any] = ()) -> Result[int, str]:
+        if self.table == Identifier('autism'): return Err('can not operate on master table')
+
+        t = db.get_table_by_name(self.table)
+        if not t: return Err(t.err())
+        table = t.ok()
+
+        rs = TableRowSet(table)
+        if self.where is not None:
+            rs = FilteredRowSet(rs, self.where, args)
+
+        ids: List[int] = [row.id for row in rs.iter()]
+
+        for i in ids:
+            t = table.delete(i)
+            if not t: return Err(t.err())
+
+        return Ok(len(ids))
