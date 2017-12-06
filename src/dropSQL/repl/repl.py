@@ -88,7 +88,7 @@ class Repl:
                 self.PS = self.PS2
 
             elif stmts.err().is_syntax():
-                print('syntax error:', stmts.err())
+                print(stmts.err())
                 self.reset()
 
     def reset(self):

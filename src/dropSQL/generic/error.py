@@ -65,3 +65,5 @@ class Syntax(Error):
         return self
 
     def __repr__(self) -> str: return f'Error::Syntax({self.expected!r}, {self.got!r})'
+
+    def __str__(self) -> str: return f'Syntax error: expected {self.expected}, got {self.got}.'
