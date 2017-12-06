@@ -1,5 +1,6 @@
 from typing import *
 
+from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
@@ -53,7 +54,7 @@ class DropTable(AstStmt):
 
         return IOk(DropTable(if_exists, table))
 
-    def execute(self, db, args: List[Any] = ()) -> Result[bool, None]:
+    def execute(self, db, args: ARGS_TYPE = ()) -> Result[bool, None]:
         from dropSQL.fs import DBFile
         db: DBFile = db
 

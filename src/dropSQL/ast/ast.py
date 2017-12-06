@@ -1,9 +1,13 @@
 import abc
 from typing import *
 
+from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
+
+if TYPE_CHECKING:
+    from dropSQL import fs
 
 __all__ = ['Ast', 'AstStmt', 'FromSQL']
 
@@ -27,7 +31,7 @@ class AstStmt(Ast, metaclass=abc.ABCMeta):
     """
 
     @abc.abstractmethod
-    def execute(self, db, args: List[Any] = ()) -> Result[None, None]:
+    def execute(self, db: 'fs.DBFile', args: ARGS_TYPE = ()) -> Result[None, None]:
         ...
 
 

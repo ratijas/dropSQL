@@ -1,5 +1,6 @@
 from typing import *
 
+from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
@@ -103,7 +104,7 @@ class CreateTable(AstStmt):
 
         return IOk(columns)
 
-    def execute(self, db: 'fs.DBFile', args: List[Any] = ()) -> Result[bool, str]:
+    def execute(self, db: 'fs.DBFile', args: ARGS_TYPE = ()) -> Result[bool, str]:
         t = db.get_table_by_name(self.table)
         if t:
             if self.if_not_exists is not None:  # error-tolerant
