@@ -28,8 +28,9 @@ class AliasedTable(Alias):
         self.name = name
 
     def row_set(self, db: 'fs.DBFile') -> Result[RowSet, str]:
-        rs = db.get_row_set(self.name)
-        if rs is None: return Err(f'Table {self.name} not found')
+        r = db.get_row_set(self.name)
+        if not r: return Err(r.err())
+        rs = r.ok()
 
         if self.alias is not None:
             rs = RenameTableRowSet(rs, self.alias)

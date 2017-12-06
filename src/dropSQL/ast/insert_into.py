@@ -98,12 +98,13 @@ class InsertInto(AstStmt, FromSQL['InsertInto']):
         # 1. find table by name
         # 2. reorder columns in query according to table
         # 3. underlying insert
-        table = db.get_table_by_name(self.table)
-        if table is None: return Err(f'Table {self.table} not found')
+        t = db.get_table_by_name(self.table)
+        if not t: return Err(t.err())
+        table = t.ok()
 
-        res = self.transition_vector(table)
-        if not res: return Err(res.err())
-        transition = res.ok()
+        t = self.transition_vector(table)
+        if not t: return Err(t.err())
+        transition = t.ok()
 
         ctx = Context.empty()
         ctx.args = args

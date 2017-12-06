@@ -65,21 +65,22 @@ class Repl:
                 for stmt in stmts.ok():
                     res = self.conn.execute_statement(stmt, [])
                     if not res:
-                        print(res)
-                        continue
-
-                    r = res.ok()
-                    if isinstance(r, RowSet):
-                        fmt = PrettyFormatter.with_row_set(r)
-                        fmt.format(sys.stdout)
+                        err = res.err()
+                        print('Error:', err, file=sys.stderr)
 
                     else:
-                        print(r)
-                        # stmt = self.conn.prepare_statement('select * from file where name = ?1').ok()
-                        # cursor = stmt.execute(self.conn, ['readme.md'])
-                        # for row in cursor:
-                        #     print(row)
-                        # only one statement
+                        r = res.ok()
+                        if isinstance(r, RowSet):
+                            fmt = PrettyFormatter.with_row_set(r)
+                            fmt.format(sys.stdout)
+
+                        else:
+                            print(r)
+                            # stmt = self.conn.prepare_statement('select * from file where name = ?1').ok()
+                            # cursor = stmt.execute(self.conn, ['readme.md'])
+                            # for row in cursor:
+                            #     print(row)
+                            # only one statement
 
                 self.reset()
 

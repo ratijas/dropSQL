@@ -11,6 +11,7 @@ from dropSQL.engine.column import Column
 from dropSQL.engine.row_set.mock import MockRowSet
 from dropSQL.engine.row_set.row_set import RowSet
 from dropSQL.engine.row_set.table import TableRowSet
+from dropSQL.generic import *
 from dropSQL.parser.tokens import Identifier
 from .block import Block, BLOCK_SIZE
 from .block_storage import BlockStorage
@@ -59,21 +60,23 @@ class DBFile(BlockStorage):
 
         return self.tables
 
-    def get_table_by_name(self, name: Identifier) -> Optional[Table]:
+    def get_table_by_name(self, name: Identifier) -> Result[Table, str]:
         for table in self.get_tables():
-            if table.get_table_name() == name: return table
+            if table.get_table_name() == name:
+                return Ok(table)
         else:
-            return None
+            return Err(f'Table {name} not found')
 
-    def get_row_set(self, table_name: Identifier) -> Optional[RowSet]:
+    def get_row_set(self, table_name: Identifier) -> Result[RowSet, str]:
         if table_name == Identifier('autism'):
-            return self.master_table()
+            return Ok(self.master_table())
 
         else:
-            table = self.get_table_by_name(table_name)
-            if table is None: return None
+            t = self.get_table_by_name(table_name)
+            if not t: return Err(t.err())
+            table = t.ok()
 
-            return TableRowSet(table)
+            return Ok(TableRowSet(table))
 
     def read_block(self, block_num) -> Block:
         self.file.seek(BLOCK_SIZE * block_num)
