@@ -9,14 +9,13 @@ from typing import *
 from dropSQL.ast import *
 from dropSQL.engine.column import Column
 from dropSQL.engine.row_set import *
+from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.tokens import Identifier
 from .block import Block, BLOCK_SIZE
 from .block_storage import BlockStorage
 from .metadata import Metadata
 from .table import Table
-
-MEMORY = ':memory:'
 
 
 class DBFile(BlockStorage):
@@ -30,7 +29,7 @@ class DBFile(BlockStorage):
         self.path: str = path
         self.file: io.BufferedIOBase
 
-        if path == ":memory:":
+        if path == MEMORY:
             self.file = io.BytesIO()
         else:
             if not os.path.exists(self.path):
@@ -41,7 +40,7 @@ class DBFile(BlockStorage):
 
     def _allocate_base(self):
         size = 0
-        if self.path != ":memory:":
+        if self.path != MEMORY:
             if os.path.exists(self.path):
                 size = os.stat(self.path).st_size
 
@@ -64,6 +63,13 @@ class DBFile(BlockStorage):
                 return Ok(table)
         else:
             return Err(f'Table {name} not found')
+
+    def new_table(self) -> Result[Table, str]:
+        for table in self.get_tables():
+            if table.get_table_name().identifier == '':
+                return Ok(table)
+        else:
+            return Err('Can not allocate any more tables')
 
     def get_row_set(self, table_name: Identifier) -> Result[RowSet, str]:
         if table_name == Identifier('autism'):

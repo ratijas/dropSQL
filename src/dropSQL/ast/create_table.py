@@ -7,6 +7,9 @@ from .ast import AstStmt
 from .column_def import ColumnDef
 from .existence import IfNotExists
 
+if TYPE_CHECKING:
+    from dropSQL import fs
+
 
 class CreateTable(AstStmt):
     def __init__(self, if_not_exists: Optional[IfNotExists], table: Identifier, columns: List[ColumnDef]) -> None:
@@ -100,24 +103,22 @@ class CreateTable(AstStmt):
 
         return IOk(columns)
 
-    def execute(self, db, args: List[Any] = ()) -> Result[bool, None]:
-        from dropSQL.fs import DBFile
-        db: DBFile = db
-
-        for table in db.get_tables():
-            name = table.get_table_name()
-
-            if name == self.table:
-                if self.if_not_exists is not None:  # error-tolerant
-                    return Ok(False)
-                else:
-                    return Err(None)
-
+    def execute(self, db: 'fs.DBFile', args: List[Any] = ()) -> Result[bool, str]:
+        t = db.get_table_by_name(self.table)
+        if t:
+            if self.if_not_exists is not None:  # error-tolerant
+                return Ok(False)
             else:
-                if table.get_table_name().identifier == '':
-                    table.set_table_name(self.table)
-                    for column in self.columns:
-                        table.add_column(column)
-                    return Ok(True)
+                return Err(f'Table {self.table} exists')
 
-        return Err(None)
+        else:
+            t = db.new_table()
+            if not t: return Err(t.err())
+            table = t.ok()
+
+            table.set_table_name(self.table)
+
+            for column in self.columns:
+                table.add_column(column)
+
+            return Ok(True)

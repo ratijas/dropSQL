@@ -3,7 +3,8 @@ from typing import *
 from dropSQL.ast.ast import AstStmt
 from dropSQL.generic import *
 from dropSQL.parser.streams.statements import Statements
-from .db_file import DBFile, MEMORY
+from .db_file import DBFile
+from dropSQL.engine.types import *
 
 
 class Connection:
