@@ -24,5 +24,5 @@ class RenameTableRowSet(RowSet):
 
     def iter(self) -> Iterator[Row]:
         for row in self.inner.iter():
-            new_row = Row(self, row.data)
+            new_row = Row(self, row.data, row.id)
             yield new_row

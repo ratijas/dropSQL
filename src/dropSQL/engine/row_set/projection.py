@@ -59,5 +59,5 @@ class ProjectionRowSet(RowSet):
                     if not res: raise ValueError(res.err())
                     data.append(res.ok())
 
-            new_row = Row(self, data)
+            new_row = Row(self, data, row.id)
             yield new_row

@@ -19,5 +19,5 @@ class MockRowSet(RowSet):
         return self._columns
 
     def iter(self) -> Iterator[Row]:
-        for data in self._data:
-            yield Row(self, data)
+        for (i, data) in enumerate(self._data):
+            yield Row(self, data, i + 1)

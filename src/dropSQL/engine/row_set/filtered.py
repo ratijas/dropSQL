@@ -50,4 +50,4 @@ class FilteredRowSet(RowSet):
             res = self.expr.eval_with(ctx)
             if not res: raise ValueError(res.err())
             if res.ok() != 0:
-                yield row
+                yield Row(self, row.data, row.id)

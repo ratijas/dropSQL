@@ -28,7 +28,7 @@ class TableRowSet(RowSet):
         i = 0
         while i < n:
             res = self.table.select(i)
+            if res:
+                row = res.ok()
+                yield Row(self, row, i)
             i += 1
-            if not res: continue
-            row = res.ok()
-            yield Row(self, row)

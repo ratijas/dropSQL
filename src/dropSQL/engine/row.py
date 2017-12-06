@@ -9,7 +9,10 @@ if TYPE_CHECKING:
 
 
 class Row(collections.abc.Sequence):
-    def __init__(self, row_set: 'RowSet', data: ROW_TYPE):
+    __slots__ = ['id', 'set', 'data']
+
+    def __init__(self, row_set: 'RowSet', data: ROW_TYPE, ID: Optional[int] = None):
+        self.id: Optional[int] = ID
         self.set = row_set
         self.data = data
 
