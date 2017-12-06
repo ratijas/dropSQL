@@ -11,4 +11,4 @@ class UpdateSetTestCase(TestCase):
         self.assertTrue(res)
         us = res.ok()
         self.assertIsNotNone(us.where)
-        self.assertEqual(len(us.assign), 2)
+        self.assertEqual(len(us.assignments), 2)
