@@ -50,7 +50,7 @@ class PrettyFormatter(Formatter):
                 width[i] = max(len(cell), width[i])
 
         f.write(' ')  # shift to the right for the sliding effect
-        f.write(self.separator.join(c.ljust(w) for (c, w) in zip(columns, width)))
+        f.write(self.separator.join(c.center(w) for (c, w) in zip(columns, width)))
         f.write(os.linesep)
         f.write(self.separator.join(''.ljust(w, '/') for w in width))
         f.write(os.linesep)

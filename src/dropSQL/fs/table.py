@@ -313,7 +313,6 @@ class Table:
             else: raise NotImplementedError
             # @formatter:on
             if not isinstance(value, ty):
-                print('A' * 100)
                 return IErr(f'value #{i} has type {type(value).__name__}, expected: {ty.__name__}')
 
         return IOk(None)
