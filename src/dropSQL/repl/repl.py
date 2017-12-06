@@ -128,9 +128,11 @@ Type in commands and watch the output.
 .tables     Show all tables in the database.
 
 /create table t(a integer, b float, c varchar(42)) /drop
-/drop table if exists t /drop
-/insert into t (a, c, b) values (13.37, 42, 'morty'), (.0, 0, '') /drop
-/select *, a, 2 * b, c /as d from t Alias /where (c > 100) /and (f /= '') /drop
+/insert into t (a, c, b) values (42, 'morty', 13.37), ('', 0, .0) /drop
+/select *, a, 2 * b, c /as d from t Alias /where (a < 100) /and (c /= '') /drop
+/update t set c = 'rick', a = a + 1 /drop
+/delete from t where c > 'r' /drop
+/drop   table if exists t /drop
 """
 
 
