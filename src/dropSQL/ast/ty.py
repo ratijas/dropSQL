@@ -1,10 +1,11 @@
 import abc
+from typing import *
 
 from dropSQL.generic import *
 from dropSQL.parser.streams import *
 from dropSQL.parser.tokens import *
-
 from .ast import Ast
+from .expression import *
 
 __all__ = [
     'Ty',
@@ -13,8 +14,10 @@ __all__ = [
     'VarCharTy',
 ]
 
+LiteralTy = TypeVar('LiteralType', ExpressionLiteralInt, ExpressionLiteralFloat, ExpressionLiteralVarChar)
 
-class Ty(Ast, metaclass=abc.ABCMeta):
+
+class Ty(Generic[LiteralTy], Ast, metaclass=abc.ABCMeta):
     @classmethod
     def from_sql(cls, tokens: Stream[Token]) -> IResult['Ty']:
         """
@@ -45,18 +48,30 @@ class Ty(Ast, metaclass=abc.ABCMeta):
         else:
             return IErr(Syntax('integer, float or varchar type', str(tok)))
 
+    @abc.abstractmethod
+    def construct(self, primitive: PrimitiveTy) -> LiteralTy:
+        """
+        Construct `Expression` object from the primitive.
+        """
 
-class IntegerTy(Ty):
+
+class IntegerTy(Ty[ExpressionLiteralInt]):
     def to_sql(self) -> str:
         return 'integer'
 
+    def construct(self, primitive: int) -> ExpressionLiteralInt:
+        return ExpressionLiteralInt(primitive)
 
-class FloatTy(Ty):
+
+class FloatTy(Ty[ExpressionLiteralFloat]):
     def to_sql(self) -> str:
         return 'float'
 
+    def construct(self, primitive: float) -> ExpressionLiteralFloat:
+        return ExpressionLiteralFloat(primitive)
 
-class VarCharTy(Ty):
+
+class VarCharTy(Ty[ExpressionLiteralVarChar]):
     def __init__(self, width: int) -> None:
         super().__init__()
 
@@ -64,6 +79,9 @@ class VarCharTy(Ty):
 
     def to_sql(self) -> str:
         return f'varchar({self.width})'
+
+    def construct(self, primitive: str) -> ExpressionLiteralVarChar:
+        return ExpressionLiteralVarChar(primitive)
 
     @classmethod
     def from_sql(cls, tokens: Stream[Token]) -> IResult['VarCharTy']:

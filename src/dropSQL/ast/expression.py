@@ -20,6 +20,7 @@ __all__ = [
     'ExpressionReference',
     'ExpressionParen',
     'ExpressionBinary',
+    'PrimitiveTy',
 ]
 
 
@@ -98,14 +99,14 @@ class Expression(Ast, FromSQL['Expression'], metaclass=abc.ABCMeta):
         """
 
 
-T = TypeVar('T', int, float, str)
+PrimitiveTy = TypeVar('PrimitiveTy', int, float, str)
 
 
-class ExpressionLiteral(Expression, Generic[T]):
-    def __init__(self, lit: T) -> None:
+class ExpressionLiteral(Expression, Generic[PrimitiveTy]):
+    def __init__(self, lit: PrimitiveTy) -> None:
         super().__init__()
 
-        self.value: T = lit
+        self.value: PrimitiveTy = lit
 
     def __eq__(self, o: object) -> bool:
         return isinstance(o, type(self)) and self.value == o.value
