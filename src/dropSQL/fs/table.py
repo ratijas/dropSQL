@@ -6,34 +6,113 @@ from dropSQL.ast.ty import *
 from dropSQL.engine.types import *
 from dropSQL.generic import *
 from dropSQL.parser.tokens import Identifier
-from .block import Block, BLOCK_SIZE, POINTER_SIZE
+from .block import *
 from .block_storage import BlockStorage
 
-BYTEORDER = 'big'
-INT = 0
-FLOAT = 0xffff
 RAW_TYPE = Union[bytes, int, float]
 
 
 class Descriptor:
-    def __init__(self, table_name: Identifier, pointers: List[int], records: int, columns: List[ColumnDef]) -> None:
-        super().__init__()
+    """
+    Descriptor object holds information about associated table.
 
-        self.table_name = table_name
+    Just as a table can not be created from outside of `DBFile` class,
+    `Descriptor` object can only be returned from table's methods.
+    Workflow with descriptor:
+    >>> table = Table(...)
+    >>> d = table.descriptor()
+    >>> d.name = Identifier('employer')
+    >>> d.save().ok()
+    Descriptor object should not be stored apart from table.
+    """
+
+    N_POINTERS = 13
+
+    __slots__ = ['table', 'name', 'pointers', 'records', 'columns']
+
+    def __init__(self, table: 'Table', table_name: Identifier, pointers: List[int], records: int,
+                 columns: List[ColumnDef]) -> None:
+        super().__init__()
+        assert len(pointers) == Descriptor.N_POINTERS
+
+        self.table = table
+        self.name = table_name
         self.pointers = pointers
         self.records = records
         self.columns = columns
 
     @classmethod
-    def empty(cls) -> 'Descriptor':
-        return Descriptor(Identifier(''), [0] * 13, 0, [])
+    def empty(cls, table: 'Table') -> 'Descriptor':
+        return Descriptor(table, Identifier(''), [0] * Descriptor.N_POINTERS, 0, [])
+
+    @classmethod
+    def decode(cls, table: 'Table') -> 'Descriptor':
+        try:
+            block = table._load_block()
+
+        except AssertionError:
+            return cls.empty(table)
+
+        else:
+            table_name = Identifier((block.data.split(b'\0')[0]).decode("UTF-8"), True)
+            pointers = [int.from_bytes(block.data[4040 + i * 4:4040 + (i + 1) * 4], byteorder=BYTEORDER)
+                        for i in range(Descriptor.N_POINTERS)]
+            records = int.from_bytes(block.data[4092:], byteorder=BYTEORDER)
+            columns: List[ColumnDef] = []
+
+            column_descriptors = block.data[block.data.find(b'\0') + 1: 4040]
+
+            i = 0
+            while column_descriptors[i] != 0:
+                null = column_descriptors.find(b'\0', i)
+                name = column_descriptors[i:null].decode("UTF-8")
+                ty = Ty.decode(column_descriptors[null + 1: null + 3])
+
+                columns.append(ColumnDef(Identifier(name), ty, False))  # TODO: primary key
+                i = null + 3
+
+            return Descriptor(table, table_name, pointers, records, columns)
+
+    def save(self) -> Result[None, str]:
+        if self.table.descriptor() is not self: return Err('Descriptor is outdated')
+
+        block = bytearray(BLOCK_SIZE)
+        i = 0  # insertion pointer
+
+        data = self.name.identifier.encode('UTF-8')
+        block[i:i + len(data)] = data
+        i += len(data) + 1  # 1 for zero-byte
+
+        for col in self.columns:
+            data = col.name.identifier.encode('UTF-8')
+            block[i:i + len(data)] = data
+            i += len(data) + 1  # 1 for zero-byte
+
+            data = col.ty.encode()
+            block[i:i + len(data)] = data
+            i += len(data)
+
+        # leave enough room for Descriptor pointers and number of records
+        i = BLOCK_SIZE - POINTER_SIZE * (Descriptor.N_POINTERS + 1)
+
+        for pointer in self.pointers:
+            data = pointer.to_bytes(POINTER_SIZE, byteorder=BYTEORDER)
+            block[i:i + len(data)] = data
+            i += len(data)
+
+        assert i == BLOCK_SIZE - POINTER_SIZE
+        data = self.records.to_bytes(POINTER_SIZE, byteorder=BYTEORDER)
+        block[i:i + len(data)] = data
+
+        self.table._write_block(Block(block))
+        return Ok(None)
 
 
 class Table:
     def __init__(self, connection: BlockStorage, index: int) -> None:
         self.connection = connection
         self.index = index
-        self.cached_descriptor: Optional[Descriptor] = None
+        self._descriptor: Optional[Descriptor] = None
 
     def _load_block(self) -> Block:
         return self.connection.read_block(1 + self.index)
@@ -41,79 +120,29 @@ class Table:
     def _write_block(self, block: Block) -> None:
         self.connection.write_block(1 + self.index, block)
 
-    def _decode_descriptor(self) -> Descriptor:
-        if self.cached_descriptor is None:
-            try:
-                block = self._load_block()
-            except AssertionError:
-                block = Block(b'\0' * BLOCK_SIZE)
-
-            table_name = Identifier((block.data.split(b'\0')[0]).decode("UTF-8"), True)
-            pointers = [int.from_bytes(block.data[4040 + i * 4:4040 + (i + 1) * 4], byteorder=BYTEORDER)
-                        for i in range(0, 13)]
-            records = int.from_bytes(block.data[4092:], byteorder=BYTEORDER)
-            columns: List[ColumnDef] = []
-
-            column_descriptors = block.data[block.data.find(b'\0') + 1: 4040]
-            # meow
-            i = 0
-            while column_descriptors[i] != 0:
-                meow = column_descriptors.find(b'\0', i)
-                nyaa = column_descriptors[i:meow].decode("UTF-8")
-                mjau = int.from_bytes(column_descriptors[meow + 1:meow + 3], byteorder=BYTEORDER)
-                if mjau == INT:
-                    purr = IntegerTy()
-                elif mjau == FLOAT:
-                    purr = FloatTy()
-                else:
-                    purr = VarCharTy(mjau)
-                columns.append(ColumnDef(Identifier(nyaa), purr, False))  # TODO: primary key
-                i = meow + 3
-
-            self.cached_descriptor = Descriptor(table_name, pointers, records, columns)
-
-        return self.cached_descriptor
-
-    def _encode_descriptor(self, descriptor: Descriptor):
-        self.cached_descriptor = None
-        # sys.stderr.write('Encoding: ' + str(descriptor) + '\n')
-        data = descriptor.table_name.identifier.encode("UTF-8") + b'\0'
-        for col in descriptor.columns:
-            data += col.name.identifier.encode("UTF-8") + b'\0'
-            if isinstance(col.ty, IntegerTy):
-                data += b'\0\0'
-            elif isinstance(col.ty, FloatTy):
-                data += b'\xff\xff'
-            elif isinstance(col.ty, VarCharTy):
-                data += col.ty.width.to_bytes(2, byteorder=BYTEORDER)
-            else:
-                raise NotImplementedError
-        while len(data) < 4040:
-            data += b'\0'
-        for p in descriptor.pointers:
-            data += p.to_bytes(4, byteorder=BYTEORDER)
-        data += descriptor.records.to_bytes(4, byteorder=BYTEORDER)
-
-        self._write_block(Block(data))
+    def descriptor(self) -> Descriptor:
+        if self._descriptor is None:
+            self._descriptor = Descriptor.decode(self)
+        return self._descriptor
 
     def get_table_name(self) -> Identifier:
-        return self._decode_descriptor().table_name
+        return self.descriptor().name
 
     def set_table_name(self, new_name: Identifier) -> None:
-        descriptor = self._decode_descriptor()
-        descriptor.table_name = new_name
-        self._encode_descriptor(descriptor)
+        descriptor = self.descriptor()
+        descriptor.name = new_name
+        descriptor.save().ok()
 
     def get_columns(self) -> List[ColumnDef]:
-        return self._decode_descriptor().columns
+        return self.descriptor().columns
 
     def count_records(self) -> int:
-        return self._decode_descriptor().records
+        return self.descriptor().records
 
     def add_column(self, column: ColumnDef):
-        descriptor = self._decode_descriptor()
+        descriptor = self.descriptor()
         descriptor.columns.append(column)
-        self._encode_descriptor(descriptor)
+        descriptor.save().ok()
 
     def _add_block(self):
         self._add_zero_level_block() or self._add_first_level_block() or self._add_second_level_block() or self._add_third_level_block()
@@ -133,19 +162,19 @@ class Table:
         return False
 
     def _add_zero_level_block(self) -> bool:
-        descriptor = self._decode_descriptor()
-        for i in range(0, 10):
+        descriptor = self.descriptor()
+        for i in range(10):
             if descriptor.pointers[i] == 0:
                 descriptor.pointers[i] = self.connection.allocate_block()
-                self._encode_descriptor(descriptor)
+                descriptor.save().ok()
                 return True
         return False
 
     def _add_first_level_block(self) -> bool:
-        descriptor = self._decode_descriptor()
+        descriptor = self.descriptor()
         if descriptor.pointers[10] == 0:
             descriptor.pointers[10] = self.connection.allocate_block()
-            self._encode_descriptor(descriptor)
+            descriptor.save().ok()
         block_pointer = descriptor.pointers[10]  # first indirect pointer
         return self._add_pointer(block_pointer)
 
@@ -173,7 +202,7 @@ class Table:
         # sys.stderr.write("_get_data_pointer({})\n".format(block_number))
         if block_number < 10:
             # zero level block
-            block_pointer = self._decode_descriptor().pointers[block_number]
+            block_pointer = self.descriptor().pointers[block_number]
         elif block_number < 10 + 1024:
             # 1 level block
             block_pointer = self._get_block_pointer_1(block_number - 10)
@@ -192,7 +221,7 @@ class Table:
     def _get_block_pointer_1(self, data_block_index, pointer=None):
         # sys.stderr.write("_get_block_pointer_1({}, {})\n".format(data_block_index, pointer))
         if not pointer:
-            pointer = self._decode_descriptor().pointers[10]
+            pointer = self.descriptor().pointers[10]
             if pointer == 0:
                 return 0
         return self._get_pointer(pointer, data_block_index)
@@ -216,10 +245,10 @@ class Table:
         """
         :return: old record counter
         """
-        descriptor = self._decode_descriptor()
+        descriptor = self.descriptor()
         rc = descriptor.records
         descriptor.records += 1
-        self._encode_descriptor(descriptor)
+        descriptor.save().ok()
         return rc
 
     def _get_data_block_with_record(self, record_num: int) -> bytes:
@@ -293,7 +322,8 @@ class Table:
         return self.insert(values, index)
 
     def drop(self) -> None:
-        self._encode_descriptor(Descriptor.empty())
+        self._descriptor = Descriptor.empty(self)
+        self._descriptor.save().ok()
 
     def _validate_insert_values(self, values: ROW_TYPE) -> Result[None, str]:
         """
