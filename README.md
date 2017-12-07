@@ -32,7 +32,22 @@ Things we dream of, but have not implemented yet include:
 
 # Storage
 
-Description coming soon...
+Storage consists of 4KB blocks. 
+First block contains database name and number of allocated blocks. 
+Next 16 blocks contain table descriptors. Table descriptor contains:
+- Table name
+- Column names and types
+- Number of rows in table
+- 10 direct pointers to data blocks
+- 1 pointer to block of direct pointers
+- 1 pointer to block of first-level indirect pointers
+- 1 pointer to block of second-level indirect pointers (Not implemented)
+- 1 pointer to block of third-level indirect pointers (Not implemented)
+
+Data blocks contain continuous sequence of table records and 'alive'/'removed' mark.
+
+Storage driver allows inserting new records and deleting, updating and selecting records 
+by ID, as well as creating and deleting tables.
 
 # setup.py
 
