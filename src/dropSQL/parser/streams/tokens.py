@@ -119,7 +119,13 @@ class Tokens(Stream[Token]):
             if self.characters.current().ok() == '\\':
                 # escape sequence
                 self.characters.next()
-            string += self.characters.current().ok_or('')
+            char = self.characters.current().ok_or('')
+            if char == 'n':
+                string += '\n'
+            elif char == 't':
+                string += '\t'
+            else:
+                string += char
 
         if self.characters.current().is_err():
             return IErr(Incomplete())
