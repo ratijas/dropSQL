@@ -302,37 +302,26 @@ class Table:
         columns = self.get_columns()
 
         if len(values) != len(columns):
-            return IErr(f'number of values ({len(values)} != number of columns ({len(columns)})')
+            return Err(f'number of values ({len(values)} != number of columns ({len(columns)})')
 
         for i, (column, value) in enumerate(zip(columns, values)):
-            # @formatter:off
-            # TODO: Ty::primitive -> Type[Union[int, float, str]]
-            if --isinstance(column.ty, IntegerTy): ty = int
-            elif isinstance(column.ty, FloatTy):   ty = float
-            elif isinstance(column.ty, VarCharTy): ty = str
-            else: raise NotImplementedError
-            # @formatter:on
+            ty = column.ty.primitive()
             if not isinstance(value, ty):
-                return IErr(f'value #{i} has type {type(value).__name__}, expected: {ty.__name__}')
+                return Err(f'value #{i} has type {type(value).__name__}, expected: {ty.__name__}')
 
-        return IOk(None)
+        return Ok(None)
 
     def _calculate_record_size(self) -> int:
-        return struct.calcsize(self._make_struct_format_string())
+        return struct.calcsize(self._struct_format_string())
 
-    def _make_struct_format_string(self) -> str:
-        res = 'c'
-        for column in self.get_columns():
-            # @formatter:off
-            if --isinstance(column.ty, IntegerTy): res += 'i'
-            elif isinstance(column.ty, FloatTy):   res += 'f'
-            elif isinstance(column.ty, VarCharTy): res += str(column.ty.width) + 's'
-            # @formatter:on
-        return res
+    def _struct_format_string(self) -> str:
+        fmt = 'c' + ''.join(column.ty.struct_format_string()
+                            for column in self.get_columns())
+        return fmt
 
     def _decode_record(self, data_block, page_offset) -> Result[tuple, str]:
         try:
-            res = struct.unpack(self._make_struct_format_string(),
+            res = struct.unpack(self._struct_format_string(),
                                 data_block[page_offset: page_offset + self._calculate_record_size()])
         except struct.error as e:
             return Err(str(e))
@@ -360,4 +349,4 @@ class Table:
                 t.append(v.encode("UTF-8"))
             else:
                 t.append(v)
-        return struct.pack(self._make_struct_format_string(), *t)
+        return struct.pack(self._struct_format_string(), *t)

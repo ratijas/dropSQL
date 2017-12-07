@@ -7,6 +7,9 @@ from dropSQL.parser.tokens import *
 from .ast import Ast
 from .expression import *
 
+if TYPE_CHECKING:
+    from dropSQL.engine.types import *
+
 __all__ = [
     'Ty',
     'IntegerTy',
@@ -54,6 +57,20 @@ class Ty(Generic[LiteralTy], Ast, metaclass=abc.ABCMeta):
         Construct `Expression` object from the primitive.
         """
 
+    @abc.abstractmethod
+    def primitive(self) -> 'DB_META_TYPE':
+        """
+        Return corresponding low-level primitive type.
+
+        Should be used for type-checking values against the table's column type before insertion.
+        """
+
+    @abc.abstractmethod
+    def struct_format_string(self) -> str:
+        """
+        Python's `struct` module format string for this type.
+        """
+
 
 class IntegerTy(Ty[ExpressionLiteralInt]):
     def to_sql(self) -> str:
@@ -62,6 +79,12 @@ class IntegerTy(Ty[ExpressionLiteralInt]):
     def construct(self, primitive: int) -> ExpressionLiteralInt:
         return ExpressionLiteralInt(primitive)
 
+    def primitive(self) -> 'DB_META_TYPE':
+        return int
+
+    def struct_format_string(self) -> str:
+        return 'i'
+
 
 class FloatTy(Ty[ExpressionLiteralFloat]):
     def to_sql(self) -> str:
@@ -69,6 +92,12 @@ class FloatTy(Ty[ExpressionLiteralFloat]):
 
     def construct(self, primitive: float) -> ExpressionLiteralFloat:
         return ExpressionLiteralFloat(primitive)
+
+    def primitive(self) -> 'DB_META_TYPE':
+        return float
+
+    def struct_format_string(self) -> str:
+        return 'f'
 
 
 class VarCharTy(Ty[ExpressionLiteralVarChar]):
@@ -82,6 +111,12 @@ class VarCharTy(Ty[ExpressionLiteralVarChar]):
 
     def construct(self, primitive: str) -> ExpressionLiteralVarChar:
         return ExpressionLiteralVarChar(primitive)
+
+    def primitive(self) -> 'DB_META_TYPE':
+        return str
+
+    def struct_format_string(self) -> str:
+        return str(self.width) + 's'
 
     @classmethod
     def from_sql(cls, tokens: Stream[Token]) -> IResult['VarCharTy']:
