@@ -146,6 +146,7 @@ class ExpressionLiteralVarChar(ExpressionLiteral[str]):
         value = self.value
         value = value.replace('\\', '\\\\')  # first escape the 'escape' symbol
         value = value.replace('\'', '\\\'')  # then escape the quote
+        value = value.replace('\n', '\\n')  # and new line
         s += value
         s += '\''
         return s

@@ -116,16 +116,15 @@ class Tokens(Stream[Token]):
 
         string = ''
         while self.characters.next().map(not_quote).ok_or(False):
-            if self.characters.current().ok() == '\\':
+            char = self.characters.current().ok()
+            if char == '\\':
                 # escape sequence
-                self.characters.next()
-            char = self.characters.current().ok_or('')
-            if char == 'n':
-                string += '\n'
-            elif char == 't':
-                string += '\t'
-            else:
-                string += char
+                char = self.characters.next().ok_or('')
+                if char == 'n':
+                    char = '\n'
+                elif char == 't':
+                    char = '\t'
+            string += char
 
         if self.characters.current().is_err():
             return IErr(Incomplete())
