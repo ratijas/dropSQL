@@ -100,6 +100,17 @@ class Ty(Generic[LiteralTy], Ast, metaclass=abc.ABCMeta):
             width = int.from_bytes(magic, byteorder=BYTEORDER)
             return VarCharTy(width)
 
+    @classmethod
+    def of(cls, primitive: 'DB_META_TYPE') -> Optional['Ty']:
+        if isinstance(primitive, int):
+            return IntegerTy()
+        elif isinstance(primitive, float):
+            return FloatTy()
+        elif isinstance(primitive, str):
+            return VarCharTy(len(primitive))
+        else:
+            return None
+
 
 class IntegerTy(Ty[ExpressionLiteralInt]):
     def to_sql(self) -> str:

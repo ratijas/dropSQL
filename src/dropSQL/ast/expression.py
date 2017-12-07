@@ -114,6 +114,7 @@ class ExpressionLiteral(Expression, Generic[PrimitiveTy]):
 
 class ExpressionLiteralInt(ExpressionLiteral[int]):
     def __init__(self, lit: int) -> None:
+        assert isinstance(lit, int)
         super().__init__(lit)
 
     def to_sql(self) -> str:
@@ -125,6 +126,7 @@ class ExpressionLiteralInt(ExpressionLiteral[int]):
 
 class ExpressionLiteralFloat(ExpressionLiteral[float]):
     def __init__(self, lit: float) -> None:
+        assert isinstance(lit, float)
         super().__init__(lit)
 
     def to_sql(self) -> str:
@@ -136,6 +138,7 @@ class ExpressionLiteralFloat(ExpressionLiteral[float]):
 
 class ExpressionLiteralVarChar(ExpressionLiteral[str]):
     def __init__(self, lit: str) -> None:
+        assert isinstance(lit, str)
         super().__init__(lit)
 
     def to_sql(self) -> str:

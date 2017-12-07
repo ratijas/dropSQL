@@ -17,12 +17,12 @@ class ProjectionRowSet(RowSet):
 
         self.inner = inner
         self._columns: List[Column] = []
-        self.outputs: List['ResultColumn'] = []
+        self.outputs: List['ResultColumn'] = columns
+        self.args = args
 
         for column in columns:
             if column.is_star():
                 self._columns.extend(Column(Identifier(''), c.name, c.ty) for c in self.inner.columns())
-                self.outputs.append(column)
 
             else:
                 aliased = column.as_expression().expression
@@ -36,9 +36,12 @@ class ProjectionRowSet(RowSet):
                 from dropSQL.ast.ty import IntegerTy
                 ty = IntegerTy()
                 self._columns.append(Column(Identifier(''), alias, ty))
-                self.outputs.append(column)
 
-        self.args = args
+        row = next(self.iter(), None)
+        if row is not None:
+            assert len(row.data) == len(self._columns)
+            for column, cell in zip(self._columns, row.data):
+                column.ty = column.ty.of(cell)
 
     def columns(self) -> List[Column]:
         return self._columns

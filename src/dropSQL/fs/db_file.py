@@ -115,11 +115,12 @@ class DBFile(BlockStorage):
             Column(autism, Identifier('name'), VarCharTy(255)),
             Column(autism, Identifier('sql'), VarCharTy(1024)),
         ]
-        rows = []
+        rows: List[List[str]] = []
         for table in self.get_tables():
-            if table.get_table_name().identifier == '': continue
-            sql: str = ', '.join(column.to_sql() for column in table.get_columns())
-            rows.append(['table', table.get_table_name().identifier, sql])
+            name = table.get_table_name()
+            if name.identifier == '': continue
+            sql = CreateTable(None, name, table.get_columns()).to_sql()
+            rows.append(['table', name.identifier, sql])
         return MockRowSet(columns, rows)
 
     def __str__(self) -> str:
