@@ -18,6 +18,16 @@ from .metadata import Metadata
 from .table import Table
 
 
+def open_db(path: str) -> io.BufferedIOBase:
+    if path == MEMORY:
+        return io.BytesIO()
+    else:
+        if not os.path.exists(path):
+            # touch file
+            with open(path, "w"): pass
+        return open(path, "r+b", buffering=16 * BLOCK_SIZE)
+
+
 class DBFile(BlockStorage):
     def __init__(self, path: str = MEMORY) -> None:
         """
@@ -27,28 +37,33 @@ class DBFile(BlockStorage):
         """
         self.tables: List[Table] = []
         self.path: str = path
-        self.file: io.BufferedIOBase
+        self.file: io.BufferedIOBase = open_db(self.path)
+        self.blocks = self.storage_size() // BLOCK_SIZE
 
-        if path == MEMORY:
-            self.file = io.BytesIO()
+        self._init_base()
+
+    def storage_size(self) -> int:
+        if isinstance(self.file, io.BytesIO):
+            return len(self.file.getbuffer())
         else:
-            if not os.path.exists(self.path):
-                with open(path, "w") as f:
-                    pass
-            self.file = open(path, "r+b", buffering=(2 ** 23))
-        self._allocate_base()
+            return os.stat(self.file.fileno()).st_size
 
-    def _allocate_base(self):
-        size = 0
-        if self.path != MEMORY:
-            if os.path.exists(self.path):
-                size = os.stat(self.path).st_size
+    def _init_base(self) -> None:
+        size = self.storage_size()
+
+        if size % BLOCK_SIZE != 0:
+            raise ValueError(f'Database size is not a multiple of {BLOCK_SIZE}')
 
         if size == 0:
-            self.file.seek(0)
-            self.file.write(b'\0' * BLOCK_SIZE * 17)
+            for i in range(17):
+                self.allocate_block()
 
-    def get_metadata(self) -> Metadata:
+    def _maybe_update_metadata_block_count(self) -> None:
+        if self.blocks >= 17:
+            self.metadata.data_blocks_count = self.blocks - 17
+
+    @property
+    def metadata(self) -> Metadata:
         return Metadata(self)
 
     def get_tables(self) -> List[Table]:
@@ -82,24 +97,36 @@ class DBFile(BlockStorage):
 
             return Ok(TableRowSet(table))
 
-    def read_block(self, block_num) -> Block:
-        self.file.seek(BLOCK_SIZE * block_num)
-        try:
-            data = Block(self.file.read(BLOCK_SIZE))
-        except AssertionError:
-            raise AssertionError("Block " + str(block_num) + " does not exist")
-        return data
+    ################
+    # BlockStorage #
+    ################
 
-    def write_block(self, block_num: int, block: Block) -> None:
-        self.file.seek(BLOCK_SIZE * block_num)
-        self.file.write(block.data)
+    def read_block(self, index: int) -> Block:
+        assert index < self.blocks, f'Block {index} does not exist'
 
-    def allocate_block(self) -> int:
-        self.file.seek(0, io.SEEK_END)
-        self.file.write(b'\0' * BLOCK_SIZE)
-        c = self.get_metadata().get_data_blocks_count()
-        self.get_metadata().set_data_blocks_count(c + 1)
-        return c + 17
+        self.file.seek(index * BLOCK_SIZE)
+        block = Block(self.file.read(BLOCK_SIZE), index)
+        return block
+
+    def write_block(self, block: Block) -> None:
+        assert block.idx < self.blocks, f'Block {block.idx} does not exist'
+
+        self.file.seek(block.idx * BLOCK_SIZE)
+        self.file.write(block)
+
+    def allocate_block(self) -> Block:
+        block = Block.empty(self.blocks)
+        self.blocks += 1
+        self._maybe_update_metadata_block_count()
+        self.write_block(block)
+        return block
+
+    def count_blocks(self) -> int:
+        return self.blocks
+
+    #################
+    # Miscellaneous #
+    #################
 
     def close(self) -> None:
         self.file.flush()

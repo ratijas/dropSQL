@@ -10,6 +10,14 @@ from .block import *
 from .block_storage import BlockStorage
 
 RAW_TYPE = Union[bytes, int, float]
+LVL0 = DIRECT_POINTERS
+LVL1 = LVL0 + POINTERS_PER_BLOCK
+LVL2 = LVL1 + POINTERS_PER_BLOCK ** 2
+LVL3 = LVL2 + POINTERS_PER_BLOCK ** 3
+
+POINTERS_PER_LVL1 = POINTERS_PER_BLOCK
+POINTERS_PER_LVL2 = POINTERS_PER_BLOCK ** 2
+POINTERS_PER_LVL3 = POINTERS_PER_BLOCK ** 3
 
 
 class Descriptor:
@@ -26,16 +34,17 @@ class Descriptor:
     Descriptor object should not be stored apart from table.
     """
 
-    N_POINTERS = 13
+    N_POINTERS = DIRECT_POINTERS + 3
 
-    __slots__ = ['table', 'name', 'pointers', 'records', 'columns']
+    __slots__ = ['table', 'block', 'name', 'pointers', 'records', 'columns']
 
-    def __init__(self, table: 'Table', table_name: Identifier, pointers: List[int], records: int,
+    def __init__(self, table: 'Table', block: Block, table_name: Identifier, pointers: List[int], records: int,
                  columns: List[ColumnDef]) -> None:
         super().__init__()
         assert len(pointers) == Descriptor.N_POINTERS
 
         self.table = table
+        self.block = block
         self.name = table_name
         self.pointers = pointers
         self.records = records
@@ -43,24 +52,28 @@ class Descriptor:
 
     @classmethod
     def empty(cls, table: 'Table') -> 'Descriptor':
-        return Descriptor(table, Identifier(''), [0] * Descriptor.N_POINTERS, 0, [])
+        return Descriptor(table, Block.empty(1 + table.index), Identifier(''), [0] * Descriptor.N_POINTERS, 0, [])
 
     @classmethod
     def decode(cls, table: 'Table') -> 'Descriptor':
         try:
-            block = table._load_block()
+            block = table.storage.read_block(1 + table.index)
 
         except AssertionError:
             return cls.empty(table)
 
         else:
-            table_name = Identifier((block.data.split(b'\0')[0]).decode("UTF-8"), True)
-            pointers = [int.from_bytes(block.data[4040 + i * 4:4040 + (i + 1) * 4], byteorder=BYTEORDER)
-                        for i in range(Descriptor.N_POINTERS)]
-            records = int.from_bytes(block.data[4092:], byteorder=BYTEORDER)
+            base = BLOCK_SIZE - (Descriptor.N_POINTERS * POINTER_SIZE) - POINTER_SIZE
+
+            def get_pointer(b: Block, i: int) -> int:
+                return int.from_bytes(b[base + i * POINTER_SIZE:base + (i + 1) * POINTER_SIZE], byteorder=BYTEORDER)
+
+            table_name = Identifier((block.split(b'\0')[0]).decode("UTF-8"), True)
+            pointers = [get_pointer(block, i) for i in range(Descriptor.N_POINTERS)]
+            records = int.from_bytes(block[BLOCK_SIZE - POINTER_SIZE:], byteorder=BYTEORDER)
             columns: List[ColumnDef] = []
 
-            column_descriptors = block.data[block.data.find(b'\0') + 1: 4040]
+            column_descriptors = block[block.find(b'\0') + 1: base]
 
             i = 0
             while column_descriptors[i] != 0:
@@ -71,54 +84,44 @@ class Descriptor:
                 columns.append(ColumnDef(Identifier(name), ty, False))  # TODO: primary key
                 i = null + 3
 
-            return Descriptor(table, table_name, pointers, records, columns)
+            return Descriptor(table, block, table_name, pointers, records, columns)
 
     def save(self) -> Result[None, str]:
         if self.table.descriptor() is not self: return Err('Descriptor is outdated')
 
-        block = bytearray(BLOCK_SIZE)
+        block = self.block
         i = 0  # insertion pointer
 
         data = self.name.identifier.encode('UTF-8')
-        block[i:i + len(data)] = data
+        block.override(i, data + b'\0')
         i += len(data) + 1  # 1 for zero-byte
 
         for col in self.columns:
             data = col.name.identifier.encode('UTF-8')
-            block[i:i + len(data)] = data
+            block.override(i, data + b'\0')
             i += len(data) + 1  # 1 for zero-byte
 
-            data = col.ty.encode()
-            block[i:i + len(data)] = data
-            i += len(data)
+            block.override(i, col.ty.encode())
+            i += 2  # column type must be 2 bytes long
 
         # leave enough room for Descriptor pointers and number of records
         i = BLOCK_SIZE - POINTER_SIZE * (Descriptor.N_POINTERS + 1)
 
         for pointer in self.pointers:
-            data = pointer.to_bytes(POINTER_SIZE, byteorder=BYTEORDER)
-            block[i:i + len(data)] = data
-            i += len(data)
+            block.override(i, pointer.to_bytes(POINTER_SIZE, byteorder=BYTEORDER))
+            i += POINTER_SIZE
 
-        assert i == BLOCK_SIZE - POINTER_SIZE
-        data = self.records.to_bytes(POINTER_SIZE, byteorder=BYTEORDER)
-        block[i:i + len(data)] = data
+        block.override(i, self.records.to_bytes(POINTER_SIZE, byteorder=BYTEORDER))
 
-        self.table._write_block(Block(block))
+        self.table.storage.write_block(block)
         return Ok(None)
 
 
 class Table:
-    def __init__(self, connection: BlockStorage, index: int) -> None:
-        self.connection = connection
+    def __init__(self, storage: BlockStorage, index: int) -> None:
+        self.storage = storage
         self.index = index
         self._descriptor: Optional[Descriptor] = None
-
-    def _load_block(self) -> Block:
-        return self.connection.read_block(1 + self.index)
-
-    def _write_block(self, block: Block) -> None:
-        self.connection.write_block(1 + self.index, block)
 
     def descriptor(self) -> Descriptor:
         if self._descriptor is None:
@@ -139,107 +142,204 @@ class Table:
     def count_records(self) -> int:
         return self.descriptor().records
 
+    # def count_pages(self) -> int:
+    #     return self.count_records() * self.record_size // BLOCK_SIZE
+
     def add_column(self, column: ColumnDef):
+        assert self.count_records() == 0, 'Adding column to non-empty table'
+
         descriptor = self.descriptor()
         descriptor.columns.append(column)
         descriptor.save().ok()
 
-    def _add_block(self):
-        self._add_zero_level_block() or self._add_first_level_block() or self._add_second_level_block() or self._add_third_level_block()
+    ###################
+    # Page management #
+    ###################
 
-    def _add_pointer_to_block(self, pointer_to_block: int):
+    def get_or_allocate_page(self, index: int) -> Block:
         """
-        Inserts a connection.allocate_block() pointer to free space in block pointed by the argument
+        Load or create if necessary a physical block by its page (virtual) index.
         """
-        block = self.connection.read_block(pointer_to_block)
-        for i in range(0, BLOCK_SIZE // POINTER_SIZE):
-            if int.from_bytes(block[POINTER_SIZE * i:POINTER_SIZE * (i + 1)], byteorder=BYTEORDER) == 0:
-                block = block[:POINTER_SIZE * i] \
-                        + (self.connection.allocate_block()).to_bytes(POINTER_SIZE, byteorder=BYTEORDER) \
-                        + block[POINTER_SIZE * (i + 1):]
-                self.connection.write_block(pointer_to_block, block)
-                return True
-        return False
 
-    def _add_zero_level_block(self) -> bool:
-        descriptor = self.descriptor()
-        for i in range(10):
-            if descriptor.pointers[i] == 0:
-                descriptor.pointers[i] = self.connection.allocate_block()
-                descriptor.save().ok()
-                return True
-        return False
+        # stage 1: get
+        pointer = self._get_page_pointer(index)
 
-    def _add_first_level_block(self) -> bool:
-        descriptor = self.descriptor()
-        if descriptor.pointers[10] == 0:
-            descriptor.pointers[10] = self.connection.allocate_block()
-            descriptor.save().ok()
-        block_pointer = descriptor.pointers[10]  # first indirect pointer
-        return self._add_pointer(block_pointer)
+        # stage 2: allocate if necessary
+        if pointer == 0:
+            self._allocate_page(index)
+            # repeat
+            pointer = self._get_page_pointer(index)
 
-    def _add_second_level_block(self) -> bool:
-        # TODO
-        raise NotImplementedError
+        return self.storage.read_block(pointer)
 
-    def _add_third_level_block(self) -> bool:
-        # TODO
-        raise NotImplementedError
-
-    def _add_pointer(self, block_pointer) -> bool:
-        block = self.connection.read_block(block_pointer)
-        for i in range(0, BLOCK_SIZE // POINTER_SIZE):
-            p = int.from_bytes(block.data[POINTER_SIZE * i:POINTER_SIZE * (i + 1)], byteorder=BYTEORDER)
-            if p == 0:
-                block.data = block.data[0:POINTER_SIZE * i] \
-                             + (self.connection.allocate_block()).to_bytes(POINTER_SIZE, byteorder=BYTEORDER) \
-                             + block.data[POINTER_SIZE * (i + 1):]
-                self.connection.write_block(block_pointer, block)
-                return True
-        return False
-
-    def _get_data_pointer(self, block_number: int):
-        # sys.stderr.write("_get_data_pointer({})\n".format(block_number))
-        if block_number < 10:
+    def _get_page_pointer(self, index: int) -> int:
+        if 0 <= index < LVL0:
             # zero level block
-            block_pointer = self.descriptor().pointers[block_number]
-        elif block_number < 10 + 1024:
+            pointer = self._get_lvl0(index)
+        elif LVL0 <= index < LVL1:
             # 1 level block
-            block_pointer = self._get_block_pointer_1(block_number - 10)
-        elif block_number < 10 + 1024 + 1024 ** 2:
+            pointer = self._get_lvl1(index)
+        elif LVL1 <= index < LVL2:
             # 2 level block
-            block_pointer = self._get_block_pointer_2(block_number - 10 - 1024)
-        else:
+            pointer = self._get_lvl2(index)
+        elif LVL2 <= index < LVL3:
             # 3 level block
-            block_pointer = self._get_block_pointer_3(block_number - 10 - 1024 - 1024 ** 2)
+            pointer = self._get_lvl3(index)
+        else:
+            # invalid / overflow
+            pointer = 0
 
-        if block_pointer == 0:
-            self._add_block()
-            return self._get_data_pointer(block_number)
-        return block_pointer
+        return pointer
 
-    def _get_block_pointer_1(self, data_block_index, pointer=None):
-        # sys.stderr.write("_get_block_pointer_1({}, {})\n".format(data_block_index, pointer))
-        if not pointer:
-            pointer = self.descriptor().pointers[10]
-            if pointer == 0:
-                return 0
-        return self._get_pointer(pointer, data_block_index)
+    def _allocate_page(self, index: int) -> None:
+        assert self._get_page_pointer(index) == 0
 
-    def _get_block_pointer_2(self, block_number):
-        # TODO
-        raise NotImplementedError
+        if 0 <= index < LVL0:
+            # zero level block
+            self._allocate_lvl0(index)
+        elif LVL0 <= index < LVL1:
+            # 1 level block
+            self._allocate_lvl1(index)
+        elif LVL1 <= index < LVL2:
+            # 2 level block
+            self._allocate_lvl2(index)
+        elif LVL2 <= index < LVL3:
+            # 3 level block
+            self._allocate_lvl3(index)
 
-    def _get_block_pointer_3(self, block_number):
-        # TODO
-        raise NotImplementedError
+    def _allocate_lvl0(self, index: int) -> None:
+        assert 0 <= index < LVL0
+        assert 0 == self._get_lvl0(index)
 
-    def _get_pointer(self, block_pointer, pointer_index):
-        assert pointer_index in range(0, BLOCK_SIZE // POINTER_SIZE), "_get_pointer received invalid pointer index"
-        # sys.stderr.write("_get_pointer({}, {})\n".format(block_pointer, pointer_index))
-        block = self.connection.read_block(block_pointer)
-        return int.from_bytes(block.data[pointer_index * POINTER_SIZE:(1 + pointer_index) * POINTER_SIZE],
-                              byteorder=BYTEORDER)
+        lvl0 = self.storage.allocate_block().idx
+
+        descriptor = self.descriptor()
+        descriptor.pointers[index] = lvl0
+        descriptor.save().ok()
+
+    def _allocate_lvl1(self, index: int) -> None:
+        assert LVL0 <= index < LVL1
+        assert 0 == self._get_lvl1(index)
+        index -= LVL0
+        descriptor = self.descriptor()
+
+        lvl1 = descriptor.pointers[DIRECT_POINTERS]  # next after direct pointers
+        if lvl1 == 0:
+            lvl1 = self.storage.allocate_block().idx
+            descriptor.pointers[DIRECT_POINTERS] = lvl1
+            descriptor.save()
+
+        self._allocate_last_mile(lvl1, index)
+
+    def _allocate_lvl2(self, index: int) -> None:
+        assert LVL1 <= index < LVL2
+        assert 0 == self._get_lvl2(index)
+        index -= LVL1
+        descriptor = self.descriptor()
+
+        lvl2 = descriptor.pointers[DIRECT_POINTERS + 1]  # second after direct pointers
+        if lvl2 == 0:
+            lvl2 = self.storage.allocate_block().idx
+            descriptor.pointers[DIRECT_POINTERS + 1] = lvl2
+            descriptor.save()
+
+        block = self.storage.read_block(lvl2)
+        lvl1 = block.get_pointer(index // POINTERS_PER_LVL1)
+        if lvl1 == 0:
+            lvl1 = self.storage.allocate_block().idx
+            block.set_pointer(index // POINTERS_PER_LVL1, lvl1)
+            self.storage.write_block(block)
+
+        self._allocate_last_mile(lvl1, index)
+
+    def _allocate_lvl3(self, index: int) -> None:
+        assert LVL2 <= index < LVL3
+        assert 0 == self._get_lvl3(index)
+        index -= LVL2
+        descriptor = self.descriptor()
+
+        lvl3 = descriptor.pointers[DIRECT_POINTERS + 2]  # second after direct pointers
+        if lvl3 == 0:
+            lvl3 = self.storage.allocate_block().idx
+            descriptor.pointers[DIRECT_POINTERS + 2] = lvl3
+            descriptor.save()
+
+        block = self.storage.read_block(lvl3)
+        lvl2 = block.get_pointer(index // POINTERS_PER_LVL2)
+        if lvl2 == 0:
+            lvl2 = self.storage.allocate_block().idx
+            block.set_pointer(index // POINTERS_PER_LVL2, lvl2)
+            self.storage.write_block(block)
+
+        block = self.storage.read_block(lvl2)
+        lvl1 = block.get_pointer(index // POINTERS_PER_LVL1)
+        if lvl1 == 0:
+            lvl1 = self.storage.allocate_block().idx
+            block.set_pointer(index // POINTERS_PER_LVL1, lvl1)
+            self.storage.write_block(block)
+
+        self._allocate_last_mile(lvl1, index)
+
+    def _allocate_last_mile(self, pointer: int, index: int) -> None:
+        lvl0 = self.storage.allocate_block().idx
+        block = self.storage.read_block(pointer)
+        block.set_pointer(index % POINTERS_PER_LVL1, lvl0)
+        self.storage.write_block(block)
+
+    def _get_lvl0(self, index: int) -> int:
+        assert 0 <= index < LVL0
+
+        lvl0 = self.descriptor().pointers[index]
+        return lvl0
+
+    def _get_lvl1(self, index: int) -> int:
+        assert LVL0 <= index < LVL1
+        index -= LVL0
+
+        lvl1 = self.descriptor().pointers[DIRECT_POINTERS]  # next after direct pointers
+        if lvl1 == 0: return 0
+        block = self.storage.read_block(lvl1)
+
+        lvl0 = block.get_pointer(index)
+        return lvl0
+
+    def _get_lvl2(self, index: int) -> int:
+        assert LVL1 <= index < LVL2
+        index -= LVL1
+
+        lvl2 = self.descriptor().pointers[DIRECT_POINTERS + 1]  # second after direct pointers
+        if lvl2 == 0: return 0
+        block = self.storage.read_block(lvl2)
+
+        lvl1 = block.get_pointer(index // POINTERS_PER_LVL1)
+        if lvl1 == 0: return 0
+        block = self.storage.read_block(lvl1)
+
+        lvl0 = block.get_pointer(index % POINTERS_PER_LVL1)
+        return lvl0
+
+    def _get_lvl3(self, index: int) -> int:
+        assert LVL2 <= index < LVL3
+        index -= LVL2
+
+        lvl3 = self.descriptor().pointers[DIRECT_POINTERS + 2]  # third after direct pointers
+        if lvl3 == 0: return 0
+        block = self.storage.read_block(lvl3)
+
+        lvl2 = block.get_pointer(index // POINTERS_PER_LVL2)
+        if lvl2 == 0: return 0
+        block = self.storage.read_block(lvl2)
+
+        lvl1 = block.get_pointer(index // POINTERS_PER_LVL1)
+        if lvl1 == 0: return 0
+        block = self.storage.read_block(lvl1)
+
+        lvl0 = block.get_pointer(index % POINTERS_PER_LVL1)
+        return lvl0
+
+    ##################
+    # CRUD Internals #
+    ##################
 
     def _increment_record_counter(self) -> int:
         """
@@ -251,20 +351,90 @@ class Table:
         descriptor.save().ok()
         return rc
 
-    def _get_data_block_with_record(self, record_num: int) -> bytes:
-        # sys.stderr.write(">{}\n".format(record_num))
-        record_offset = self._calculate_record_size() * record_num
-        page_num = record_offset // BLOCK_SIZE
-        page_offset = record_offset % BLOCK_SIZE
-        data_block = self.connection.read_block(self._get_data_pointer(page_num)).data
-        if self._calculate_record_size() + page_offset >= BLOCK_SIZE:
-            data_block += self.connection.read_block(self._get_data_pointer(page_num + 1)).data
-        return data_block
+    def page_and_offset(self, record: int) -> (int, int):
+        record_offset = self.record_size * record
+        page = record_offset // BLOCK_SIZE
+        offset = record_offset % BLOCK_SIZE
 
-    def _set_data_with_record(self, base_page_num: int, data: bytes):
-        self.connection.write_block(self._get_data_pointer(base_page_num), Block(data[0: BLOCK_SIZE]))
-        if len(data) > BLOCK_SIZE:
-            self.connection.write_block(self._get_data_pointer(base_page_num + 1), Block(data[BLOCK_SIZE:]))
+        return page, offset
+
+    def _read_record(self, index: int) -> bytes:
+        page, offset = self.page_and_offset(index)
+
+        return self._read(page, offset, self.record_size)
+
+    def _read(self, page: int, offset: int, n: int) -> bytes:
+        """ Read n bytes from the page(s) starting from given page (virtual index) with given offset.
+
+        Record may cross page boundary.
+        """
+        record = bytearray()
+
+        # first page
+
+        block = self.get_or_allocate_page(page)
+        chunk = block[offset:min(offset + n, BLOCK_SIZE)]
+        record.extend(chunk)
+
+        # full pages
+
+        first = len(chunk)
+        i = 1
+        while first + (i + 1) * BLOCK_SIZE <= n:
+            block = self.get_or_allocate_page(page + i)
+            record.extend(block)
+            i += 1
+
+        # last, beginning of the page
+
+        if len(record) < n:
+            block = self.get_or_allocate_page(page + i)
+            chunk = block[:n - len(record)]
+            record.extend(chunk)
+
+        assert len(record) == n
+
+        return bytes(record)
+
+    def _write_record(self, record: bytes, index: int) -> None:
+        page, offset = self.page_and_offset(index)
+
+        self._write(page, offset, record)
+
+    def _write(self, page: int, offset: int, record: bytes) -> None:
+        """ Write down record (bytes) onto the page (virtual index) starting with given offset.
+
+        Record may cross page boundary.
+        """
+
+        # first page
+
+        chunk = record[:BLOCK_SIZE - offset]
+        block = self.get_or_allocate_page(page)
+        block.override(offset, chunk)
+        self.storage.write_block(block)
+
+        # full pages
+
+        i = 1
+        while (i + 1) * BLOCK_SIZE - offset <= len(record):
+            chunk = record[i * BLOCK_SIZE - offset:(i + 1) * BLOCK_SIZE - offset]
+            block = self.get_or_allocate_page(page + i)
+            block.override(0, chunk)
+            self.storage.write_block(block)
+            i += 1
+
+        # last, beginning of the page
+
+        chunk = record[i * BLOCK_SIZE - offset:]
+        if chunk:
+            block = self.get_or_allocate_page(page + i)
+            block.override(0, chunk)
+            self.storage.write_block(block)
+
+    ########
+    # CRUD #
+    ########
 
     def insert(self, values: ROW_TYPE, record_num: int = -1) -> Result[int, str]:
         """
@@ -272,17 +442,14 @@ class Table:
         """
         res = self._validate_insert_values(values)
         if not res: return Err(res.err())
+        record = self._encode_record(values)
+
         if record_num > self.count_records():
             return Err('record_num({}) > #records({})'.format(record_num, self.count_records()))
+
         if record_num == -1: record_num = self._increment_record_counter()
 
-        record_offset = record_num * self._calculate_record_size()
-        data_block = self._get_data_block_with_record(record_num)
-        page_offset = record_offset % BLOCK_SIZE
-        page_num = record_offset // BLOCK_SIZE
-        record = self._encode_record(values)
-        data_block = data_block[0: page_offset] + record + data_block[page_offset + self._calculate_record_size():]
-        self._set_data_with_record(page_num, data_block)
+        self._write_record(record, record_num)
 
         return Ok(record_num)
 
@@ -290,21 +457,11 @@ class Table:
         if record_num >= self.count_records():
             return Err('record_num({}) >= #records({})'.format(record_num, self.count_records()))
 
-        data_block = self._get_data_block_with_record(record_num)
+        binary = self._read_record(record_num)
 
-        res = self._decode_record(data_block, (record_num * self._calculate_record_size()) % BLOCK_SIZE)
+        res = self._decode_record(binary)
         if not res: return Err(res.err())
-        decoded = res.ok()
-
-        row: ROW_TYPE = list()
-        for i in range(len(self.get_columns())):
-            if isinstance(decoded[i], bytes):
-                try:
-                    row.append(decoded[i].split(b'\0')[0].decode("UTF-8"))
-                except UnicodeDecodeError as e:
-                    return Err(str(e))
-            else:
-                row.append(decoded[i])
+        row = res.ok()
 
         return Ok(row)
 
@@ -312,22 +469,26 @@ class Table:
         if record_num >= self.count_records():
             return Err('record_num({}) >= #records({})'.format(record_num, self.count_records()))
 
-        record_offset = record_num * self._calculate_record_size()
-        data_block = self._get_data_block_with_record(record_num)
-        data_block = data_block[0:record_offset % BLOCK_SIZE] + b'd' + data_block[record_offset % BLOCK_SIZE + 1:]
-        self._set_data_with_record(record_offset // BLOCK_SIZE, data_block)
+        page, offset = self.page_and_offset(record_num)
+
+        self._write(page, offset, b'd')
+
         return Ok(None)
 
-    def update(self, index: int, values: ROW_TYPE) -> Result[int, str]:
+    def update(self, values: ROW_TYPE, index: int) -> Result[int, str]:
         return self.insert(values, index)
 
     def drop(self) -> None:
         self._descriptor = Descriptor.empty(self)
         self._descriptor.save().ok()
 
+    #############
+    # Internals #
+    #############
+
     def _validate_insert_values(self, values: ROW_TYPE) -> Result[None, str]:
         """
-        ensure all columns of this table are present
+        Ensure all columns of this table are present
         """
         columns = self.get_columns()
 
@@ -344,34 +505,34 @@ class Table:
     def _calculate_record_size(self) -> int:
         return struct.calcsize(self._struct_format_string())
 
+    @property
+    def record_size(self) -> int:
+        return self._calculate_record_size()
+
     def _struct_format_string(self) -> str:
         fmt = 'c' + ''.join(column.ty.struct_format_string()
                             for column in self.get_columns())
         return fmt
 
-    def _decode_record(self, data_block, page_offset) -> Result[tuple, str]:
+    def _decode_record(self, binary: bytes) -> Result[ROW_TYPE, str]:
         try:
-            res = struct.unpack(self._struct_format_string(),
-                                data_block[page_offset: page_offset + self._calculate_record_size()])
+            data = struct.unpack(self._struct_format_string(), binary)
         except struct.error as e:
             return Err(str(e))
 
-        if res[0] == b'd': return Err('Record is dead')
-        if res[0] != b'a': return Err('Incorrect record({}): {}'.format(page_offset, res))
+        if data[0] == b'd': return Err('Record is dead')
+        if data[0] != b'a': return Err('Incorrect record: {}'.format(data))
 
-        data = res[1:]
-        if len(data) != len(self.get_columns()):
-            return Err('record({}) != #columns({})'.format(len(data), len(self.get_columns())))
-        return Ok(res[1:])
+        if len(data) - 1 != len(self.get_columns()):
+            return Err('record({}) != #columns({})'.format(len(data) - 1, len(self.get_columns())))
 
-    def get_column_by_name(self, name: Identifier) -> ColumnDef:
-        for column in self.get_columns():
-            if column.name == name:
-                return column
+        r = bytes_to_str(list(data[1:]))
+        if not r: return Err(r.err())
+        return Ok(r.ok())
 
     def _encode_record(self, values: ROW_TYPE):
         """
-        assume that value types correspond to column types.
+        Assume that value types correspond to column types.
         """
         t: List[RAW_TYPE] = [b'a']  # alive FIXME
         for v in values:
@@ -380,3 +541,15 @@ class Table:
             else:
                 t.append(v)
         return struct.pack(self._struct_format_string(), *t)
+
+
+def bytes_to_str(row: ROW_TYPE) -> Result[ROW_TYPE, str]:
+    """ Convert bytes back to utf-8 str. """
+    for i in range(len(row)):
+        value = row[i]
+        if isinstance(value, bytes):
+            try:
+                row[i] = value.split(b'\0')[0].decode("UTF-8")
+            except UnicodeDecodeError as e:
+                return Err(str(e))
+    return Ok(row)

@@ -112,7 +112,7 @@ class UpdateSet(AstStmt):
             if not r: return Err(r.err())
             new_row = r.ok()
 
-            t = table.update(row.id, new_row)
+            t = table.update(new_row, row.id)
             if not t: return Err(t.err())
             count += 1
 

@@ -1,28 +1,41 @@
-from .block import Block, BLOCK_SIZE
+from dropSQL.engine.types import *
+from .block import *
 from .block_storage import BlockStorage
+
+NAME_LENGTH = 256
 
 
 class Metadata:
     def __init__(self, connection: BlockStorage):
         self.connection = connection
+        self.block: Block = connection.read_block(0)
 
-    def get_name(self) -> str:
-        return (self.connection.read_block(0).data[0:256].split(b'\0'))[0].decode("UTF-8")
+    @property
+    def name(self) -> str:
+        return (self.block[:NAME_LENGTH].partition(b'\0'))[0].decode("UTF-8")
 
-    def set_name(self, name: str) -> None:
+    @name.setter
+    def name(self, name: str) -> None:
         encoded = name.encode("UTF-8")
-        assert len(encoded) < 255, "Database name is too long"
-        try:
-            block = self.connection.read_block(0)
-        except AssertionError:
-            block = Block(b'\0' * BLOCK_SIZE)
-        block.data = encoded + block.data[len(encoded):BLOCK_SIZE]
-        self.connection.write_block(0, block)
+        assert len(encoded) < NAME_LENGTH - 1, 'Database name is too long'  # -1 for zero byte
 
-    def get_data_blocks_count(self) -> int:
-        return int.from_bytes(self.connection.read_block(0).data[255:259], byteorder='big')
+        self.block[:NAME_LENGTH] = encoded.ljust(NAME_LENGTH, b'\0')
+        self.connection.write_block(self.block)
 
-    def set_data_blocks_count(self, count: int) -> None:
-        data = self.connection.read_block(0).data
-        data = data[0:255] + count.to_bytes(4, byteorder='big') + data[259:]
-        self.connection.write_block(0, Block(data))
+    @property
+    def data_blocks_count(self) -> int:
+        """ Number of data blocks, excluding DB meta block and table meta blocks. """
+        block = self.connection.read_block(0)
+        count = block[NAME_LENGTH:NAME_LENGTH + POINTER_SIZE]
+        return int.from_bytes(count, byteorder=BYTEORDER)
+
+    @data_blocks_count.setter
+    def data_blocks_count(self, count: int) -> None:
+        count = count.to_bytes(POINTER_SIZE, byteorder=BYTEORDER)
+        self.block[NAME_LENGTH:NAME_LENGTH + POINTER_SIZE] = count
+        self.connection.write_block(self.block)
+
+    @property
+    def blocks_count(self) -> int:
+        """ Total number of blocks, including meta blocks. """
+        return 17 + self.data_blocks_count
