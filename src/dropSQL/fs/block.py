@@ -56,8 +56,7 @@ class Block(bytearray):
         self.override(index * POINTER_SIZE, binary)
 
 
-BLOCK_SIZE = 4096
-# BLOCK_SIZE = 12 * 1024
+BLOCK_SIZE = 12 * 1024  # you know, for 12k...
 _ZEROES = b'\0' * BLOCK_SIZE
 POINTER_SIZE = 4
 POINTERS_PER_BLOCK = BLOCK_SIZE // POINTER_SIZE
