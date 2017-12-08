@@ -1,10 +1,13 @@
+import re
 # noinspection PyUnresolvedReferences
 import readline
+import subprocess
 import sys
 
 from dropSQL import __version__
 from dropSQL.engine.row_set import *
 from dropSQL.fs import Connection
+from dropSQL.fs.block import BLOCK_SIZE
 from dropSQL.parser.streams.statements import Statements
 from .formatters import PrettyFormatter
 
@@ -53,9 +56,10 @@ class Repl:
             self.buffer += line
             self.buffer += '\n'
 
-            for dot in (Help, ListTables):
-                if self.buffer.strip() == f'.{dot.name}':
-                    dot.execute(self.conn)
+            for dot in (Help, ListTables, BlockDebug):
+                m = re.match(rf'\.{dot.name}\b\s*(.*)\s*', self.buffer.strip())
+                if m:
+                    dot.execute(self.conn, m.group(1))
                     self.reset()
                     continue
 
@@ -116,7 +120,7 @@ class DotCommand:
     name: str
 
     @classmethod
-    def execute(cls, conn: Connection) -> None:
+    def execute(cls, conn: Connection, arg: str) -> None:
         return
 
 
@@ -126,6 +130,7 @@ Type in commands and watch the output.
 
 .help       Show this help.
 .tables     Show all tables in the database.
+.block N    Show block N with `xxd`.
 
 /create table t(a integer, b float, c varchar(42)) /drop
 /insert into t (a, c, b) values (42, 'morty', 13.37), ('', 0, .0) /drop
@@ -140,7 +145,7 @@ class Help(DotCommand):
     name = 'help'
 
     @classmethod
-    def execute(cls, conn: Connection) -> None:
+    def execute(cls, conn: Connection, arg: str) -> None:
         print(HELP.format(conn=conn))
 
 
@@ -148,8 +153,35 @@ class ListTables(DotCommand):
     name = 'tables'
 
     @classmethod
-    def execute(cls, conn: Connection) -> None:
+    def execute(cls, conn: Connection, arg: str) -> None:
         print('tables in the database:')
         master_table = conn.file.master_table()
         f = PrettyFormatter.with_row_set(master_table)
         f.format(sys.stdout)
+
+
+class BlockDebug(DotCommand):
+    name = 'block'
+
+    @classmethod
+    def execute(cls, conn: Connection, arg: str) -> None:
+        try:
+            index = int(arg)
+
+        except ValueError:
+            print(f'Error: {arg} is not a number')
+
+        else:
+            try:
+                block = conn.file.read_block(index)
+
+            except AssertionError as e:
+                print(str(e))
+
+            else:
+                if block == b'\0' * BLOCK_SIZE:
+                    print('zero block')
+
+                else:
+                    p = subprocess.Popen(['xxd'], stdin=subprocess.PIPE)
+                    p.communicate(block)
