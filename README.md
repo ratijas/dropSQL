@@ -23,13 +23,6 @@ dropSQL supports basic CRUD operations:
 
 CLI comes with neat multi-line REPL. Start typing a statement like `/create table fruits(`, hit enter, and dropSQL will kindly ask you to proceed with different prompt style (`...` instead of `/`). It will keep reading input until whole statement is typed in. Only then the execution begins, and results are printed back to user.
 
-Things we dream of, but have not implemented yet include:
-
-- Cursor API to use dropSQL from code. For now only CLI is really usable.
-- Sub-queries as expressions, like `... /where name = (/select ... from ...) /drop`.
-- Unary operators. Even negative numbers have to be writen as `0-N`.
-- Type inference for result row set.
-
 # Storage
 
 Storage consists of 4KB blocks. 
@@ -46,8 +39,19 @@ Next 16 blocks contain table descriptors. Table descriptor contains:
 
 Data blocks contain continuous sequence of table records and 'alive'/'removed' mark.
 
-Storage driver allows inserting new records and deleting, updating and selecting records 
-by ID, as well as creating and deleting tables.
+Storage driver allows inserting, deleting, updating and selecting records
+by internal ID, as well as creating and dropping tables.
+
+# Roadmap
+
+Things we dream of, but have not implemented yet include:
+
+- Cursor API to use dropSQL from code. For now only CLI is really usable.
+- Sub-queries as expressions, like `... /where name = (/select ... from ...) /drop`.
+- Unary operators. Even negative numbers have to be writen as `0-N`.
+- Type inference for result row set.
+- Primary keys and indexes.
+
 
 # setup.py
 
