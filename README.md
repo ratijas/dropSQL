@@ -25,19 +25,18 @@ CLI comes with neat multi-line REPL. Start typing a statement like `/create tabl
 
 # Storage
 
-Storage consists of 4KB blocks. 
+Storage consists of 12KB blocks.
 First block contains database name and number of allocated blocks. 
 Next 16 blocks contain table descriptors. Table descriptor contains:
 - Table name
 - Column names and types
 - Number of rows in table
 - 10 direct pointers to data blocks
-- 1 pointer to block of direct pointers
 - 1 pointer to block of first-level indirect pointers
-- 1 pointer to block of second-level indirect pointers (Not implemented)
-- 1 pointer to block of third-level indirect pointers (Not implemented)
+- 1 pointer to block of second-level indirect pointers
+- 1 pointer to block of third-level indirect pointers
 
-Data blocks contain continuous sequence of table records and 'alive'/'removed' mark.
+Data blocks contain continuous sequence of table records. Each record starts with 'alive'/'removed' mark.
 
 Storage driver allows inserting, deleting, updating and selecting records
 by internal ID, as well as creating and dropping tables.
@@ -51,7 +50,6 @@ Things we dream of, but have not implemented yet include:
 - Unary operators. Even negative numbers have to be writen as `0-N`.
 - Type inference for result row set.
 - Primary keys and indexes.
-
 
 # setup.py
 
@@ -81,6 +79,6 @@ If you don't specify a path to database, by default non-persistent in-memory sto
 
 # Trivia
 
-Actually, 'drop' is a process of getting the axe by a student, which is usually expressed as a '/drop' slashtag in telegram group chat.
+Actually, 'drop' is a process of getting the axe by a student, which is usually expressed as a '/drop' slashtag in Telegram group chats.
 
 '/autism' is an another popular phenomena and frequently used slashtag in Innopolis.
