@@ -8,6 +8,7 @@ from dropSQL import __version__
 from dropSQL.engine.row_set import *
 from dropSQL.fs import Connection
 from dropSQL.fs.block import BLOCK_SIZE
+from dropSQL.generic import *
 from dropSQL.parser.streams.statements import Statements
 from .formatters import PrettyFormatter
 
@@ -165,23 +166,27 @@ class BlockDebug(DotCommand):
 
     @classmethod
     def execute(cls, conn: Connection, arg: str) -> None:
-        try:
-            index = int(arg)
+        r = try_int(arg)  # 'r' for 'Result'
+        if not r: return print(r.err())
+        index = r.ok()
 
-        except ValueError:
-            print(f'Error: {arg} is not a number')
+        try:
+            block = conn.file.read_block(index)
+
+        except AssertionError as e:
+            print(str(e))
 
         else:
-            try:
-                block = conn.file.read_block(index)
-
-            except AssertionError as e:
-                print(str(e))
+            if block == b'\0' * BLOCK_SIZE:
+                print('zero block')
 
             else:
-                if block == b'\0' * BLOCK_SIZE:
-                    print('zero block')
+                p = subprocess.Popen(['xxd'], stdin=subprocess.PIPE)
+                p.communicate(block)
 
-                else:
-                    p = subprocess.Popen(['xxd'], stdin=subprocess.PIPE)
-                    p.communicate(block)
+
+def try_int(x: str) -> Result[int, str]:
+    try:
+        return Ok(int(x))
+    except ValueError as e:
+        return Err(str(e))
