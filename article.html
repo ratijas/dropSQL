@@ -1,0 +1,662 @@
+Своя СУБД за 3 недели. Нужно всего-лишь каждый день немного времени уделять архитектуре; и всё остальное время вкалывать на результат, печатая и перепечатывая сотни строк кода.
+
+По закону Мерфи, если есть более одного проекта на выбор — я возьмусь за самый сложный из предложенных. Так случилось и с последним заданием курса о системах управления базами данных (СУБД).
+
+<img src="https://habrastorage.org/webt/rc/0n/pg/rc0npgm2cp9pwpwb6hpcknftmd0.jpeg" alt="обложка /dropSQL" align="center"/>
+<cut text="Дропнуть студентов"/>
+<h2>Постановка задачи</h2>
+Согласно ТЗ, требовалось создать СУБД с нуля на Vanilla Python 3.6 (без сторонних библиотек). Конечный продукт должен обладать следующими свойствами:
+<ul>
+    <li>хранит базу в бинарном формате в едином файле</li>
+    <li>DDL: поддерживает три типа данных: Integer, Float и Varchar(N). Для упрощения, все они фиксированной длины.</li>
+    <li>DML: поддерживает базовые SQL операции:
+        <ul>
+            <li>INSERT</li>
+            <li>UPDATE</li>
+            <li>DELETE</li>
+            <li>SELECT с WHERE и JOIN. С каким именно JOIN — указано не было, поэтому на всякий случай мы сделали и CROSS, и INNER</li>
+        </ul></li>
+    <li>выдерживает 100'000 записей</li>
+</ul>
+
+<hr/>
+<h2>Подход к проектированию</h2>
+Разработать СУБД с нуля казалось нетривиальной задачей (как ни странно, так оно и оказалось). Поэтому мы — <a href="https://github.com/ecat3">ecat3</a> и <a href="http://ratijas.tk/">@ratijas</a> — подошли к этому делу научно. В команде нас только двое (не считая себя и мою персону), а значит распиливать задачи и координировать их выполнение в разы легче, чем, собственно, их выполнять. По окончании распила вышло следующе:
+<table>
+    <tr>
+        <th>Задача</th>
+        <th>Исполнитель(-и)</th>
+    </tr>
+    <tr>
+        <td>Парсер + AST + REPL</td>
+        <td>ratijas, написавший не один калькулятор на всяких lex/yacc</td>
+    </tr>
+    <tr>
+        <td>Структура файла базы</td>
+        <td>ecat3, съевший собаку на файловых системах</td>
+    </tr>
+    <tr>
+        <td>Движок<br/>(низкоуровневые операции над базой)</td>
+        <td>ecat3</td>
+    </tr>
+    <tr>
+        <td>Интерфейс<br/>(высокоуровневая склейка)</td>
+        <td>Вместе</td>
+    </tr>
+</table>
+Изначально времени было выделено две недели, поэтому предполагалось выполнить индивидуальные задачи за неделю, а оставшееся время совместно уделить склейке и тестированию.
+
+С формальной частью закончили, перейдем к практической. СУБД должна быть современной и актуальной. В современном Иннополисе актуальным является месседжер Телеграм, чат-боты и общение в группах с помощью "/слештегов" (это как #хештеги, только начинаются со /слеша). Поэтому язык запросов, близко напоминающий SQL, мало того что не чувствителен к регистру, так ещё и не чувствителен к /слешу непосредственно перед любым идентификатором: 'SELECT' и '/select' это абсолютно одно и то же. Кроме того, подобно всякому студенту университета, каждая команда (statement) языка должна завершаться '/drop'. (Конечно же, тоже независимо от регистра. Кого вообще в такой ситуации волнует какой-то там регистр?)
+
+<spoiler title="Типичнейшая /днюха в /чате"><img src="https://habrastorage.org/webt/ss/kn/f3/ssknf3opseg5poir4yqfpqpu5ai.png" alt="/autist_s_dr" align="left"/></spoiler>
+Так родилась идея названия: <strong>dropSQL</strong>. Собственно <em>/drop</em>'ом называется отчисление студента из университета; по некоторым причинам, это слово получило широкое распространение у нас в Иннополисе. (Ещё один местный феномен: аутизм, или, более корректно, /autism. Но мы приберегли его на особый случай.)
+
+Первым делом разложили грамматику dropSQL на BNF (и зря — левые рекурсии не подходят нисходящим парсерам).
+
+<spoiler title="BNF грамматика dropSQL">
+<a href="https://github.com/ratijas/dropSQL/blob/master/src/dropSQL/parser/__init__.py">Полная версия по ссылке</a>
+<source>
+/stmt
+    : /create_stmt
+    | /drop_stmt
+    | /insert_stmt
+    | /update_stmt
+    | /delete_stmt
+    | /select_stmt
+    ;
+
+/create_stmt
+    : "/create" "table" existence /table_name "(" /columns_def ")" "/drop"
+    ;
+
+existence
+    : /* empty */
+    | "if" "not" "exists"
+    ;
+
+/table_name
+    : /identifier
+    ;
+
+/columns_def
+    :                   /column_def
+    | /columns_def ","  /column_def
+    ;
+
+/column_def
+    : /column_name type /primary_key
+    ;
+
+...
+</source>
+</spoiler>
+<spoiler title="Примеры валидных dropSQL команд, из онлайн справки продукта">
+<source lang="sql">
+/create table t(a integer, b float, c varchar(42)) /drop
+/insert into t (a, c, b) values (42, 'morty', 13.37), (?1, ?2, ?3) /drop
+/select *, a, 2 * b, c /as d from t Alias /where (a < 100) /and (c /= '') /drop
+/update t set c = 'rick', a = a + 1 /drop
+/delete from t where c > 'r' /drop
+/drop   table if exists t /drop
+</source>
+</spoiler>
+<hr/>
+<h2>Работаем на результат! Никаких исключений!</h2>
+После нескольких месяцев с Rust в качестве основного языка, крайне не хотелось снова погрязнуть в обработке исключений. Очевидным аргументом против исключений является то, что разбрасываться ими дорого, а ловить — громоздко. Ситуация ухудшается тем, что Python даже в версии 3.6 с Type Annotations, в отличие от той же Java, не позволяет указать типы исключений, которые могут вылететь из метода. Иначе говоря: глядя на сигнатуру метода, должно стать ясно, чего от него ожидать. Так почему бы не объеденить эти типы под одной крышей, которая называется "enum Error"? А над этим создать ещё одну "крышу" под названием Result; о нём пойдёт речь чуть ниже. Конечно, в стандартной библиотеке есть места, которые могут "взорваться"; но такие вызовы в нашем коде надежно обложены try'ями со всех сторон, которые сводят любое исключение к возврату ошибки, минимизируя возникновение внештатных ситуаций во время исполнения.
+
+Итак, было решено навелосипедить алгебраический тип результата (привет, Rust). В питоне с алгебраическими типами всё плохо; а модуль стандартной библиотеки <a href="https://docs.python.org/3/library/enum.html">enum</a> больше напоминает чистую сишечку.
+
+В худших традициях ООП, используем наследование для определения конструкторов результата: Ok и Err. И не забываем про статическую типизацию (<em>Ну мааам, у меня уже третья версия! Можно у меня будет наконец статическая типизация в Python, ну пожаалуйста?</em>):
+
+<spoiler title="result.py">
+<source lang="python">
+import abc
+from typing import *
+
+class Result(Generic[T, E], metaclass=abc.ABCMeta):
+    """
+    enum Result< T > {
+        Ok(T),
+        Err(E),
+    }
+    """
+
+    # Сборище абстрактных методов и просто дефолтных значений
+
+    def is_ok(self) -> bool:
+        return False
+
+    def is_err(self) -> bool:
+        return False
+
+    def ok(self) -> T:
+        raise NotImplementedError
+
+    def err(self) -> E:
+        raise NotImplementedError
+
+    ...
+
+class Ok(Generic[T, E], Result[T, E]):
+    def __init__(self, ok: T) -> None:
+        self._ok = ok
+
+    def is_ok(self) -> bool:
+        return True
+
+    def ok(self) -> T:
+        return self._ok
+
+    ...
+
+class Err(Generic[T, E], Result[T, E]):
+    def __init__(self, error: E) -> None:
+        self._err = error
+
+    def is_err(self) -> bool:
+        return True
+
+    def err(self) -> E:
+        return self._err
+
+    ...
+</source>
+</spoiler>
+Отлично! Приправим немного соусом из функциональных преобразований. Далеко не все понадобятся, так что возьмем необходимый минимум.
+
+<spoiler title="result.py (продолжение)">
+<source lang="python">
+class Result(Generic[T, E], metaclass=abc.ABCMeta):
+    ...
+
+    def ok_or(self, default: T) -> T:
+        ...
+
+    def err_or(self, default: E) -> E:
+        ...
+
+    def map(self, f: Callable[[T], U]) -> 'Result[U, E]':
+        # Ух-ты! Что это за одинарные кавычки тут у нас в типе возврата?
+        # Оказывается, так в Python делается своего рода "forward declaration".
+        # Даже называется немного по-другому. Почитать можно в PEP 484:
+        # https://www.python.org/dev/peps/pep-0484/#forward-references
+        ...
+
+    def and_then(self, f: Callable[[T], 'Result[U, E]']) -> 'Result[U, E]':
+        ...
+
+    def __bool__(self) -> bool:
+        # упрощает проверку через `if`
+        return self.is_ok()
+
+</source>
+</spoiler>
+И сразу пример использования:
+
+<spoiler title="Пример использования Result">
+<source lang="python">
+def try_int(x: str) -> Result[int, str]:
+    try:
+        return Ok(int(x))
+    except ValueError as e:
+        return Err(str(e))
+
+def fn(arg: str) -> None:
+    r = try_int(arg)  # 'r' for 'Result'
+    if not r: return print(r.err())  # one-liner, shortcut for `if r.is_err()`
+    index = r.ok()
+
+    print(index)  # do something with index
+</source>
+</spoiler>
+Писанина в таком стиле всё ещё занимает по 3 строчки на каждый вызов. Но зато приходит четкое понимание, где какие ошибки могли возникнуть, и что с ними произойдет. Плюс, код продолжается на том же уровне вложенности; это весьма важное качество, если метод содержит полдюжины однородных вызовов.
+
+<hr/>
+<h2>Парсер, IResult, Error::{Empty, Incomplete, Syntax}, REPL, 9600 бод и все-все-все</h2>
+Парсер занял значительную часть времени разработки. Грамотно составленный парсер должен обеспечить пользователю удобство использования фронтэнда продукта. Важнейшими задачами парсера являются:
+
+<ol>
+    <li>Внятные репорты об ошибках</li>
+    <li>Интерактивный инкрементальный построчный ввод, или, проще говоря, REPL</li>
+</ol>
+Располагая "не только лишь всей" стандартной библиотекой питона, но и своими скромными познаниями в написании парсеров, мы понимали, что придется закатать рукава, и наваять ручной рекурсивный нисходящий парсер (англ. Recursive descent parser). Дело это долгое, муторное, зато даёт высокий градус контроля над ситуацией.
+
+Один из первых вопросов, требовавших ответа: как быть с ошибками? Как быть — выше уже разобрались. Но что вообще представляет собой ошибка? Например, после "/create table" может находиться "if not exists", а может и не находиться — ошибка ли это? Если да, то какого рода? где должна быть обработана? ("Поставьте на паузу", и предложите свои варианты в комментариях.)
+
+<a href="https://github.com/ratijas/dropSQL/blob/ec01b4fda5e4137c4bee2ccc0082365451635935/src/dropSQL/parser/expected.py">Первая версия</a> парсера различала два вида ошибок: Expected (ожидали одно, а получили что-то другое) и EOF (конец файла) как подкласс предыдущего. Всё бы ничего, пока дело не дошло до REPL. Такой парсер не различает между частиным вводом (началом команды) и отсутствием чего-либо (EOF, если так можно сказать про интерактивный ввод с терминала). Только неделю спустя, методом проб и ошибок удалось найти схему, удовлетворяющую нашей доменной области.
+
+Схема состоит в том, что всё есть поток, а парсер — лишь скромный метод <em>next()</em> у потока. А также в том, что класс ошибки должен быть переписан на алгебраический (подобно Result), и вместо <em>EOF</em> введены варианты <em>Empty</em> и <em>Incomplete</em>.
+
+<img src="https://camo.githubusercontent.com/e581baffb3db3e4f749350326af32de8d5ba4363/687474703a2f2f692e696d6775722e636f6d2f4149696d5138432e6a7067" alt="everything is a stream" align="center"/>
+
+<spoiler title="Новый тип ошибки">
+<source lang="python">
+class Error(metaclass=abc.ABCMeta):
+    """
+    enum Error {
+      Empty,
+      Incomplete,
+      Syntax { expected: str, got: str },
+    }
+    """
+    def empty_to_incomplete(self) -> 'Error':
+        if isinstance(self, Empty):
+            return Incomplete()
+        else:
+            return self
+
+class Empty(Error): ...
+class Incomplete(Error): ...
+class Syntax(Error):
+    def __init__(self, expected: str, got: str) -> None: ...
+
+# stream-specific result type alias
+IResult = Result[T, Error]
+IOk = Ok[T, Error]
+IErr = Err[T, Error]
+</source>
+</spoiler>
+<spoiler title="Интерфейс потока">
+<source lang="python">
+class Stream(Generic[T], metaclass=abc.ABCMeta):
+    def current(self) -> IResult[T]: ...
+
+    def next(self) -> IResult[T]: ...
+
+    def collect(self) -> IResult[List[T]]: ...
+
+    def peek(self) -> IResult[T]: ...
+
+    def back(self, n: int = 1) -> None: ...
+
+    @abc.abstractmethod
+    def next_impl(self) -> IResult[T]: ...
+</source>
+</spoiler>
+Поток — это абстракция. Потоку всё-равно, какие элементы производить. Поток знает, когда остановиться. Всё, что требуется для реализации своего потока — переписать единственный абстрактный метод <em>next_impl() -> IResult[T]</em>. Что должен вернуть этот метод? Рассмотрим на примере потока токенов:
+<table>
+    <tr>
+        <th>Что там дальше</th>
+        <th>Пример (ввод)</th>
+        <th>Тип результата</th>
+        <th>Пример (результат)</th>
+    </tr>
+    <tr>
+        <td>Всё нормально, очередной элемент</td>
+        <td><pre>/delete from t ...</pre></td>
+        <td>IOk(token)</td>
+        <td>IOk(Delete())</td>
+    </tr>
+    <tr>
+        <td>Остались одни пробелы и комментарии</td>
+        <td><pre>\n -- wubba</pre>
+            <pre>   -- lubba</pre>
+            <pre>   -- dub dub!</pre></td>
+        <td>IErr(Empty())</td>
+        <td>IErr(Empty())</td>
+    </tr>
+    <tr>
+        <td>Начало чего-то большего</td>
+        <td><pre>'string...</pre> (нет закрывающей кавычки)</td>
+        <td>IErr(Incomplete())</td>
+        <td>IErr(Incomplete())</td>
+    </tr>
+    <tr>
+        <td>Ты втираешь мне какую-то дичь</td>
+        <td><pre>#$%</pre></td>
+        <td>IErr(Syntax(...))</td>
+        <td>IErr(Syntax(expected='token', got='#'))</td>
+    </tr>
+</table>
+
+Потоки организованы в <a href="https://github.com/ratijas/dropSQL/tree/master/src/dropSQL/parser/streams">иерархию</a>. Каждый уровень содержит свой буфер, что позволяет заглядывать вперёд (<em>peek() -> IResult[T]</em>) и откатываться назад (<em>back(n: int = 1) -> None</em>) при необходимости.
+
+<img src="https://habrastorage.org/webt/zz/_z/hc/zz_zhcvelzsfonpcyqwvkxaf6sa.png" alt="Иерархия потоков" align="center"/>
+
+А самое приятное, что поток можно "<a href="https://github.com/ratijas/dropSQL/blob/12cb1c6137c33f2ab249caa620bad3c7b2b2fd70/src/dropSQL/parser/streams/stream.py#L20">собрать</a>" в один большой список всех <em>IOk(</em>элементов<em>)</em>, что выдает <em>next()</em> — до первой <em>IErr()</em>, разумеется. При чем список вернется лишь когда <em>IErr</em> содержала <em>Empty</em>; в противном случае, ошибка пробросится выше. Эта конструкция позволяет легко и элегантно построить REPL.
+
+<spoiler title="Основа REPL">
+<source lang="python">
+class Repl:
+    def reset(self):
+        self.buffer = ''
+        self.PS = self.PS1
+
+    def start(self):
+        self.reset()
+
+        while True:
+            self.buffer += input(self.PS)
+            self.buffer += '\n'
+
+            stmts = Statements.from_str(self.buffer).collect()
+
+            if stmts.is_ok():
+                ...  # execute one-by-one
+                self.reset()
+
+            elif stmts.err().is_incomplete():
+                self.PS = self.PS2  # read more
+
+            elif stmts.err().is_syntax():
+                print(stmts.err())
+                self.reset()
+
+            else: pass  # ignore Err(Empty())
+</source>
+</spoiler>
+
+<h3>Characters</h3>
+Этот поток проходит по символам строки. Единственный тип ошибки: <em>Empty</em> в конце строки.
+
+<h3>Tokens</h3>
+Поток токенов. Его второе имя — Лексер. Тут встречаются и ошибки, и строки без закрывающих кавычек, и всякое…
+
+Каждый тип токенов, включая каждое ключевое слово по отдельности, представлен отдельным классом-вариантом абстрактного класса Token (или лучше думать про него как про enum Token?) Это для того, чтобы парсеру команд (statements) было удобно кастовать токены к конкретным типам.
+
+<spoiler title="Типичная часть лексера">
+<source lang="python">
+    def next_impl(self, ...) -> IResult[Token]:
+        ...
+
+        char = self.characters.current().ok()
+
+        if char == ',':
+            self.characters.next()
+            return IOk(Comma())
+
+        elif char == '(':
+            self.characters.next()
+            return IOk(LParen())
+
+        elif ...
+</source>
+</spoiler>
+<h3>Statements</h3>
+Кульминация, парсер собственной персоной. Вместо тысячи слов, пару сниппетов:
+
+<spoiler title="streams/statements.py">
+<source lang="python">
+class Statements(Stream[AstStmt]):
+    def __init__(self, tokens: Stream[Token]) -> None:
+        super().__init__()
+
+        self.tokens = tokens
+
+    @classmethod
+    def from_str(cls, source: str) -> 'Statements':
+        return Statements(Tokens.from_str(source))
+
+    def next_impl(self) -> IResult[AstStmt]:
+
+        t = self.tokens.peek()
+        if not t: return Err(t.err())
+        tok = t.ok()
+
+        if isinstance(tok, Create):
+            return CreateTable.from_sql(self.tokens)
+
+        if isinstance(tok, Drop):
+            return DropTable.from_sql(self.tokens)
+
+        if isinstance(tok, Insert):
+            return InsertInto.from_sql(self.tokens)
+
+        if isinstance(tok, Delete):
+            return DeleteFrom.from_sql(self.tokens)
+
+        if isinstance(tok, Update):
+            return UpdateSet.from_sql(self.tokens)
+
+        if isinstance(tok, Select):
+            return SelectFrom.from_sql(self.tokens)
+
+        return Err(Syntax('/create, /drop, /insert, /delete, /update or /select', str(tok)))
+</source>
+</spoiler>
+<spoiler title="ast/delete_from.py">
+<source lang="python">
+class DeleteFrom(AstStmt):
+    def __init__(self, table: Identifier, where: Optional[Expression]) -> None:
+        super().__init__()
+
+        self.table = table
+        self.where = where
+
+    @classmethod
+    def from_sql(cls, tokens: Stream[Token]) -> IResult['DeleteFrom']:
+        """
+        /delete_stmt
+            : "/delete" "from" /table_name /where_clause /drop
+            ;
+        """
+        # next item must be the "/delete" token
+        t = tokens.next().and_then(Cast(Delete))
+        if not t: return IErr(t.err())
+
+        t = tokens.next().and_then(Cast(From))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        t = tokens.next().and_then(Cast(Identifier))
+        if not t: return IErr(t.err().empty_to_incomplete())
+        table = t.ok()
+
+        t = WhereFromSQL.from_sql(tokens)
+        if not t: return IErr(t.err().empty_to_incomplete())
+        where = t.ok()
+
+        t = tokens.next().and_then(Cast(Drop))
+        if not t: return IErr(t.err().empty_to_incomplete())
+
+        return IOk(DeleteFrom(table, where))
+</source>
+</spoiler>
+Важно отметить, что любые ошибки типа <em>Empty</em>, кроме самого первого, парсеры должны преобразовывать в <em>Incomplete</em>, для корректной работы REPL. Для этого есть вспомагательная функция <em>empty_to_incomplete() -> Error</em>. Чего нет, и никогда не будет, так это макросов: строка <em>if not t: return IErr(t.err().empty_to_incomplete())</em> встречается в кодовой базе по меньшей мере 50 раз, и тут ничего не попишешь. Серъёзно, в какой-то момент захотелось юзать Сишный препроцессор.
+
+<hr/>
+<h2>Про бинарный формат</h2>
+Глобально файл базы поделен на блоки, и размер файла кратен размеру блока. Размер блока по умолчанию равен 12 КиБ, но опционально может быть увеличен до 18, 24 или 36 КиБ. Если Вы дата сатанист на магистратуре, и у вас очень большие данные — можно поднять даже до 42 КиБ.
+
+Блоки пронумерованы с нуля. Нулевой блок содержит метаданные обо всей базе. За ним 16 блоков под метаданные таблиц. С блока #17 начинаются блоки с данными. <strong>Указателем на блок</strong> называется порядковый номер блока
+
+<img src="https://habrastorage.org/webt/6d/np/xp/6dnpxprn9mbznje8tcv-o3ljsbc.png" alt="File" align="center"/>
+
+<strong>Метаданных базы</strong> на текущий момент не так много: название длиной до 256 байт и кол-во блоков с данными.
+
+<img src="https://habrastorage.org/webt/4u/05/up/4u05upvnj-rccevgxf40lacisbm.png" alt="Database Meta" align="center"/>
+
+<strong>Мета-блок таблицы</strong> самый непростой. Тут хранится название таблицы, список всех колонок с их типами, количество записей и указатели на блоки данных.
+
+Количество таблиц фиксировано в коде. Хотя это относительно легко может быть исправлено, если хранить указатели на мета-блоки таблиц в мета-блоке базы.
+
+<img src="https://habrastorage.org/webt/db/xt/rd/dbxtrd_bvzk0fey90paacc8lxve.png" alt="Table Meta" align="center"/>
+
+Указатели на блоки работают по принципу <a href="https://en.wikipedia.org/wiki/Inode_pointer_structure">указателей в inode</a>. Об этом прекрасно писал Таненбаум и дюжины других уважаемых людей. Таким образом, таблицы видят свои блоки с данными как "страницы". Разница в том, что страницы, идущие с точки зрения таблицы по порядку, физически располагаются в файле как бог на душу положит. Проводя аналогии с virtual memory в операционках, страница: virtual page number, блок: physical page number.
+
+<img src="https://upload.wikimedia.org/wikipedia/commons/a/a2/Ext2-inode.gif" alt="inode pointer structure" align="center">
+
+Блоки данных не имеют конкретной структуры сами по себе. Но когда их объеденить в порядке, продиктованном указателями, они предстанут непрерывным потоком записей (record / tuple) фиксированной длины. Таким образом, зная порядковый номер записи, извлечь или записать её — операция практически константного времени, O(1<sup>*</sup>), с амортизацией на выделение новых блоков при необходимости.
+
+Первый байт записи содержит информацию о том, жива ли эта запись, или была удалена. Остальные работу по упаковке и распаковке данных берет на себя стандартный модуль <a href="https://docs.python.org/3/library/struct.html">struct</a>.
+
+Операция /update всегда делает перезапись "in-place", а /delete только подменяет первый байт. Операция VACUUM не поддерживается.
+
+<img src="https://habrastorage.org/webt/em/_g/n4/em_gn4s3q2avpystlsgg3swfzfa.png" alt="Data Blocks" align="center"/>
+
+<hr/>
+<h2>Про операции над таблицами, RowSet и джойны</h2>
+Пришло время прочно скрепить лучшее из двух миров несколькими мотками скотча.
+
+<strong>MC слева</strong> — AST узлы верхнего уровня (подклассы AstStmt). Их выполнение происходит в контексте соединения с базой. Также поддерживаются позиционные аргументы — "?N" токены в выражениях в теле запроса, например: "/delete from student /where name = ?1 /drop". Сами <a href="https://github.com/ratijas/dropSQL/blob/master/src/dropSQL/ast/expression.py">выражения</a> рекурсивны, а их вычисление не представляет собой научного прорыва.
+
+<strong>MC справа</strong> — драйвер БД, оперирующий над записями по одной за раз, используя порядковый номер внутри таблицы как идентификатор. Только он знает, какие таблицы существуют, и как с ними работать.
+
+Поехали!
+
+Их первый совместный сингл про <strong>креативность</strong>. Создать новую таблицу не сложнее, чем взять первый попавшийся пустой дескриптор из 16, и вписать туда название и список колонок.
+
+Затем, трек с символическим названием <strong>/drop</strong>. В домашней версии демо-записи происходит следующее: 1) найти дескриптор таблицы по имени; 2) обнулить. Кого волнуют неосвобожденные блоки со страницами данных?
+
+<strong>Insert</strong> снисходителен к нарушению порядка колонок, поэтому перед отправкой кортежа на запись, его пропускают через специальный фильтр <a href="https://github.com/ratijas/dropSQL/blob/8c2431a96ff5216d09d92ba8089ae6ddac057f93/src/dropSQL/ast/insert_into.py#L129">transition_vector</a>.
+
+Далее речь пойдет про работу с записями таблиц, поэтому позвольте сразу представить нашего рефери: <strong>RowSet</strong>.
+
+<spoiler title="Сферический RowSet в вакууме">
+<source lang="python">
+class RowSet(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def columns(self) -> List[Column]:
+        """
+        Describe columns in this row set.
+        """
+
+    @abc.abstractmethod
+    def iter(self) -> Iterator['Row']:
+        """
+        Return a generator which yields rows from the underlying row stream or a table.
+        """
+</source>
+</spoiler>
+Главный конкретный подвид этого зверя — <a href="https://github.com/ratijas/dropSQL/blob/8c2431a96ff5216d09d92ba8089ae6ddac057f93/src/dropSQL/engine/row_set/table.py#L11">TableRowSet</a> — занимается выборкой всех живых (не удаленных) записей по порядку. Прочие разновидности RowSet в dropSQL реализуют необходимый минимум <a href="https://habrahabr.ru/post/145381/">реляционной алгебры</a>.
+
+<table>
+    <tr>
+        <th>Оператор реляционной алгебры</th>
+        <th>Обозначение</th>
+        <th>Класс</th>
+    </tr>
+    <tr>
+        <td>Проекция</td>
+        <td>π<sub>(ID, NAME)</sub> expr</td>
+        <td><pre>ProjectionRowSet</pre></td>
+    </tr>
+    <tr>
+        <td>Переименование</td>
+        <td>ρ<sub>a/b</sub> expr</td>
+        <td><pre>ProjectionRowSet +
+RenameTableRowSet</pre></td>
+    </tr>
+    <tr>
+        <td>Выборка</td>
+        <td>σ<sub>(PRICE>90)</sub> expr</td>
+        <td><pre>FilteredRowSet</pre></td>
+    </tr>
+    <tr>
+        <td>Декартово произведение</td>
+        <td>PRODUCTS × SELLERS</td>
+        <td><pre>CrossJoinRowSet</pre></td>
+    </tr>
+    <tr>
+        <td>Inner Join<br>(назовём это расширением)</td>
+        <td>σ<sub>(cond)</sub>( A x B )</td>
+        <td><pre>InnerJoinRowSet =
+FilteredRowSet(
+    CrossJoinRowSet(...))</pre></td>
+    </tr>
+</table>
+Кроме того ещё есть программируемый MockRowSet. Он хорош для тестирования. Также, с его помощью возможен доступ к <strong>мастер-таблице</strong> под названием "<u>/autism</u>".
+
+Прелесть в том, что различные RowSet'ы можно комбинировать как угодно: выбрать таблицу «student», указать алиас «S», отфильтровать «/where scholarship > '12k'», выбрать другую таблицу «courses», соединить «/on (course/sid = S/id) /and (course/grade < 'B')», проецировать на «S/id, S/first_name/as/name» — это представляется следующей иерархией:
+<source lang="python">
+ProjectionRowSet([S/id, S/first_name/as/name])
+    FilteredRowSet((course/sid = S/id) /and (course/grade < 'B'))
+        CrossJoinRowSet
+            FilteredRowSet(scholarship > '12k')
+                RenameTableRowSet('S')
+                    TableRowSet('student')
+            TableRowSet('courses')
+</source>
+Итак, вооружившись столь мощным инструментом, возвращаемся к лютневой музыке XVI века…
+
+Про четвертый трек, <strong>/select</strong>, тут больше нечего добавить. Симфония из RowSet'ов такая, что душу завораживает. Благодаря этому, реализация получилась крайне лаконичной.
+
+<spoiler title="Реализация /select ... from">
+<source lang="python">
+class SelectFrom(AstStmt):
+	...
+
+    def execute(self, db: 'fs.DBFile', args: ARGS_TYPE = ()) -> Result['RowSet', str]:
+        r = self.table.row_set(db)
+        if not r: return Err(r.err())
+        rs = r.ok()
+
+        for join in self.joins:
+            r = join.join(rs, db, args)
+            if not r: return Err(r.err())
+            rs = r.ok()
+
+        if self.where is not None:
+            rs = FilteredRowSet(rs, self.where, args)
+
+        rs = ProjectionRowSet(rs, self.columns, args)
+
+        return Ok(rs)
+</source>
+</spoiler>
+Два последних: <strong>/update</strong> и <strong>/delete</strong> используют наработки предшественника. При чем /update применяет технику, похожую на описанный выше "transition_vector".
+
+Такой вот концерт! Спасибо за внимание! Занавес!..
+
+<hr>
+<h2>Хотелки</h2>
+Пока что не сбывшиеся мечты:
+
+<ol>
+    <li>Поддержка /primary key не только в парсере</li>
+    <li>Унарные операторы</li>
+    <li>Вложенные запросы</li>
+    <li>Вывод типов для выражений</li>
+    <li>Удобный API для Python</li>
+</ol>
+
+Так как это был учебный проект, мы не получили за него ни копейки. Хотя, судя по статистике sloc, могли бы сейчас кушать красную икорку.
+
+<spoiler title="Отчет sloccount">
+<source>
+Have a non-directory at the top, so creating directory top_dir
+Creating filelist for dropSQL
+Creating filelist for tests
+Creating filelist for util
+Categorizing files.
+Finding a working MD5 command....
+Found a working MD5 command.
+Computing results.
+
+
+SLOC	Directory	SLOC-by-Language (Sorted)
+2764    dropSQL         python=2764
+675     tests           python=675
+28      util            python=28
+
+
+Totals grouped by language (dominant language first):
+python:        3467 (100.00%)
+
+
+
+
+Total Physical Source Lines of Code (SLOC)                = 3,467
+Development Effort Estimate, Person-Years (Person-Months) = 0.74 (8.85)
+ (Basic COCOMO model, Person-Months = 2.4 * (KSLOC**1.05))
+Schedule Estimate, Years (Months)                         = 0.48 (5.73)
+ (Basic COCOMO model, Months = 2.5 * (person-months**0.38))
+Estimated Average Number of Developers (Effort/Schedule)  = 1.55
+Total Estimated Cost to Develop                           = $ 99,677
+ (average salary = $56,286/year, overhead = 2.40).
+SLOCCount, Copyright (C) 2001-2004 David A. Wheeler
+SLOCCount is Open Source Software/Free Software, licensed under the GNU GPL.
+SLOCCount comes with ABSOLUTELY NO WARRANTY, and you are welcome to
+redistribute it under certain conditions as specified by the GNU GPL license;
+see the documentation for details.
+Please credit this data as "generated using David A. Wheeler's 'SLOCCount'."
+</source>
+</spoiler>
+
+<h2>Благодарности</h2>
+<ul>
+    <li>Университету Иннополис за уютное окружение и крутые знакомства.</li>
+    <li>Профессору Евгению Зуеву за курс по компиляторам вообще, и за лекцию о парсерах в частности</li>
+    <li>Профессору Manuel Mazzara и TA <a href="https://vk.com/id18222919">Руслану</a> за курс по СУБД. <a href="https://habrastorage.org/webt/5g/2m/xz/5g2mxzdkiqwncskg5cgivjconiw.png">/GodBlessMazzara</a></li>
+</ul>
+
+А в следующий раз мы заимплементим свою не-реляционку, с агрегейшн пайплайнами и транзакциями; и назовём её — /noDropSQL!
