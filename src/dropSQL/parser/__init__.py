@@ -88,12 +88,12 @@ existence
     ;
 
 /columns_def
-    :               /column_def
-    | /columns_def  /column_def
+    :                   /column_def
+    | /columns_def ","  /column_def
     ;
 
 /column_def
-    : /column_name type /primary_key ","
+    : /column_name type /primary_key
     ;
 
 /columns_names
