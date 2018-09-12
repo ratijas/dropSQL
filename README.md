@@ -2,6 +2,12 @@
 
 Simple database engine and binary format. Yet another university sucksignment.
 
+# tl;dr
+
+Article on habr.com describing dropSQL internal architecture and design: https://habrahabr.ru/post/347274/
+
+![Article cover](https://hsto.org/webt/rc/0n/pg/rc0npgm2cp9pwpwb6hpcknftmd0.jpeg)
+
 # SQL
 
 dropSQL is a query language, similar to SQL found in modern DBMS implementations. While keywords and identifiers are case-insensitive, most noticeable distinctions are that
